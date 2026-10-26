@@ -2,6 +2,15 @@
 import { PrinterDto } from '@/models/printers/printer.model'
 
 // Context types for each dialog
+export interface PrintAssignmentContext {
+  prints: {
+    printerId: number
+    printerName: string
+    fileName: string
+    existingFile?: boolean
+  }[]
+}
+
 export interface AddOrUpdatePrinterDialogContext {
   id?: number
   floorId?: number
@@ -47,6 +56,7 @@ export interface JobThumbnailViewerContext {
 
 // Map dialog names to their context types
 export interface DialogContextTypeMap {
+  [DialogName.PrintAssignmentDialog]: PrintAssignmentContext
   [DialogName.AddOrUpdatePrinterDialog]: AddOrUpdatePrinterDialogContext
   [DialogName.AddOrUpdateFloorDialog]: AddOrUpdateFloorDialogContext
   [DialogName.AddOrUpdateCameraDialog]: AddOrUpdateCameraDialogContext
@@ -64,4 +74,3 @@ export interface DialogContextTypeMap {
 
 // Helper type to get context type for a specific dialog
 export type DialogContextType<T extends DialogName> = DialogContextTypeMap[T]
-

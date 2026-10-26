@@ -4,6 +4,7 @@ export interface QueuedUpload {
   printer: PrinterDto
   file: File
   startPrint: boolean
+  assignedTo?: string
 }
 
 export interface FailedQueuedUpload extends QueuedUpload {

@@ -13,4 +13,5 @@ export interface FilesDto {
 export interface LastPrintStartDto {
   fileName: string
   startedAt: string
+  assignedTo?: string | null
 }

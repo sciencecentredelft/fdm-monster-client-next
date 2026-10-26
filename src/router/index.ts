@@ -9,6 +9,8 @@ import FloorSettings from '@/components/Settings/FloorSettings.vue'
 import EmergencyCommands from '@/components/Settings/EmergencyCommands.vue'
 import NotFoundView from '@/components/NotFound/NotFoundView.vue'
 import { useAuthStore } from '@/store/auth.store'
+import { useProfileStore } from '@/store/profile.store'
+import { personalSettingsPaths } from './setting.constants'
 import { RouteNames } from './route-names'
 import PermissionDenied from '../components/Login/PermissionDenied.vue'
 import LoginView from '../components/Login/LoginView.vue'
@@ -96,7 +98,7 @@ const router = createRouter({
         {
           path: '',
           meta: NeedsAuth,
-          redirect: '/settings/floors'
+          redirect: () => useProfileStore().isAdmin ? '/settings/floors' : '/settings/account'
         },
         {
           path: 'account',
@@ -236,6 +238,19 @@ router.beforeEach(async (to, from, next) => {
   }
 
   return next()
+})
+
+router.beforeEach(async (to) => {
+  if (!to.matched.some(record => record.path === '/settings') || personalSettingsPaths.has(to.path)) return
+
+  const profile = useProfileStore()
+  await profile.getProfile()
+  if (!profile.isAdmin) {
+    return {
+      name: RouteNames.PermissionDenied,
+      query: { roles: 'ADMIN', page: to.path, error: 'Administrator access required' }
+    }
+  }
 })
 
 export default router

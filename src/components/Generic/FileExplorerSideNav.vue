@@ -167,6 +167,7 @@
           </v-btn>
 
           <v-btn
+            v-if="profileStore.isAdmin"
             :color="isEnabled ? 'warning' : 'success'"
             size="small"
             variant="outlined"
@@ -196,6 +197,7 @@
           </v-btn>
 
           <v-btn
+            v-if="profileStore.isAdmin"
             size="small"
             variant="outlined"
             @click="clickSettings()"
@@ -451,7 +453,10 @@ import { hasWebInterface } from '@/shared/printer-capabilities.constants'
 import { useDialog } from '@/shared/dialog.composable'
 import { useFileExplorer } from '@/shared/file-explorer.composable'
 import { useSettingsStore } from '@/store/settings.store'
+import { useProfileStore } from '@/store/profile.store'
 import AdvancedFileList from '@/components/Files/AdvancedFileList.vue'
+import { useSnackbar } from '@/shared/snackbar.composable'
+import { errorSummary } from '@/utils/error.utils'
 
 interface TreeNode {
   id: string
@@ -466,6 +471,7 @@ const printersStore = usePrinterStore()
 const printerStateStore = usePrinterStateStore()
 const fileExplorer = useFileExplorer()
 const settingsStore = useSettingsStore()
+const profileStore = useProfileStore()
 const advancedFileListEnabled = computed(() => settingsStore.serverSettings?.advancedFileListEnabled === true)
 
 const fileSearch = ref<string | undefined>(undefined)
@@ -703,10 +709,19 @@ function clickSettings() {
 
 async function clickPrintFile(file: FileDto) {
   if (!printerId.value) return
-  await printerStateStore.selectAndPrintFile({
-    printerId: printerId.value,
-    fullPath: file.path
-  })
+  const targetPrinterId = printerId.value
+  try {
+    const started = await printerStateStore.selectAndPrintFile({
+      printerId: targetPrinterId,
+      fullPath: file.path
+    })
+    if (started && printerId.value === targetPrinterId && settingsStore.serverSettings?.advancedFileListEnabled) {
+      await refreshFiles()
+    }
+  } catch (error) {
+    console.error('Could not start print:', error)
+    useSnackbar().openErrorMessage({ title: 'Could not start print', subtitle: errorSummary(error) })
+  }
 }
 
 function clickDownloadFile(path: string) {

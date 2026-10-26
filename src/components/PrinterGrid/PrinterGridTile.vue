@@ -2,15 +2,18 @@
   <div v-drop-printer-position="{ x, y, printerSet: printer }">
     <v-card
       v-drop-upload="{ printers: [printer] }"
-      :draggable="!!printer"
+      :draggable="profileStore.isAdmin && !!printer"
       :ripple="isOnline"
       :class="{
         'tile-large': largeTilesEnabled,
+        'tile-with-assignee': !!currentAssignee,
         'tile-selected': selected,
         'tile-unselected': unselected,
         'tile-no-printer': !printer,
-        'tile-draggable': !!printer
+        'tile-draggable': profileStore.isAdmin && !!printer,
+        'tile-status-colored': !!statusCardStyle
       }"
+      :style="statusCardStyle"
       class="tile colored-tile rounded-lg"
       elevation="5"
       @click="selectPrinterPosition()"
@@ -50,6 +53,7 @@
           style="height: 100%"
         >
           <PrinterCreateAction
+            v-if="profileStore.isAdmin"
             :floor-id="floorStore.selectedFloor?.id"
             :floor-x="x"
             :floor-y="y"
@@ -144,8 +148,8 @@
       <div
         v-if="printer"
         :style="{
-          position: largeTilesEnabled ? 'inherit' : 'absolute',
-          top: largeTilesEnabled ? 'inherit' : '28px'
+          position: largeTilesEnabled || currentAssignee ? 'inherit' : 'absolute',
+          top: largeTilesEnabled || currentAssignee ? 'inherit' : '28px'
         }"
         class="printer-info"
         style="overflow: clip"
@@ -153,6 +157,13 @@
         <!-- File name -->
         <small class="file-name">
           {{ currentPrintingFilePath ?? 'No File' }}
+        </small>
+        <small
+          v-if="currentAssignee"
+          class="file-name print-assignee"
+          :title="`Assigned to: ${currentAssignee}`"
+        >
+          Assigned to: {{ currentAssignee }}
         </small>
       </div>
 
@@ -268,7 +279,7 @@
           </template>
         </v-tooltip>
 
-        <v-tooltip top>
+        <v-tooltip v-if="profileStore.isAdmin" top>
           <template v-slot:activator="{ props }">
             <v-btn
               :size="largeTilesEnabled ? 'small' : 'x-small'"
@@ -347,11 +358,13 @@
 
 <script lang="ts" setup>
 import { computed, PropType } from 'vue'
+import { defaultGridStatusColors, getGridStatus, gridStatusTextColor } from '@/shared/grid-status-colors'
 import { useRouter } from 'vue-router'
 import { PrintersService } from '@/backend'
 import { usePrinterStore } from '@/store/printer.store'
 import { DialogName } from '@/components/Generic/Dialogs/dialog.constants'
 import { useSettingsStore } from '@/store/settings.store'
+import { useProfileStore } from '@/store/profile.store'
 import { useFloorStore } from '@/store/floor.store'
 import { interpretStates } from '@/shared/printer-state.constants'
 import { usePrinterStateStore } from '@/store/printer-state.store'
@@ -379,6 +392,7 @@ const printerStore = usePrinterStore()
 const printerStateStore = usePrinterStateStore()
 const floorStore = useFloorStore()
 const settingsStore = useSettingsStore()
+const profileStore = useProfileStore()
 const controlDialog = useDialog(DialogName.PrinterControlDialog)
 const addOrUpdateDialog = useDialog(DialogName.AddOrUpdatePrinterDialog)
 const fileExplorer = useFileExplorer()
@@ -419,6 +433,16 @@ const isPaused = computed(() => {
   return printerStateStore.isPrinterPaused(printerId.value)
 })
 
+const currentAssignee = computed(() => {
+  if (!settingsStore.serverSettings?.showPrintAssigneeOnGrid || !props.printer?.enabled
+    || !isOnline.value || (!isPrinting.value && !isPaused.value) || !printerId.value) return null
+  const events = printerStateStore.printerEventsById[printerId.value]
+  const assignment = events?.currentPrintAssignment
+  const file = events?.current?.payload?.job?.file
+  const path = file?.path || file?.name
+  return assignment?.fileName === path ? assignment.assignedTo : null
+})
+
 const selected = computed(() => {
   if (!printerId.value) return false
   return printerStore.isSelectedPrinter(printerId.value)
@@ -448,6 +472,17 @@ const printerStateColor = computed(() => {
     return defaultColor
   }
   return states.rgb || defaultColor
+})
+
+const statusCardStyle = computed(() => {
+  if (!props.printer || !settingsStore.serverSettings?.gridStatusColorsEnabled) return undefined
+  const status = getGridStatus(
+    props.printer,
+    printerStateStore.socketStatesById[props.printer.id],
+    printerStateStore.printerEventsById[props.printer.id]
+  )
+  const background = settingsStore.serverSettings.gridStatusColors?.[status] ?? defaultGridStatusColors[status]
+  return { backgroundColor: background, '--grid-status-text-color': gridStatusTextColor(background) }
 })
 
 const currentJob = computed(() => {
@@ -519,6 +554,10 @@ const clickRefreshSocket = async () => {
 }
 
 const onDragStart = (ev: DragEvent) => {
+  if (!profileStore.isAdmin) {
+    ev.preventDefault()
+    return
+  }
   if (!ev.dataTransfer || !props.printer?.id) return
 
   // Notify that we're dragging a placed printer (for showing remove zone)
@@ -599,6 +638,15 @@ const selectPrinterPosition = async () => {
   min-height: 120px;
 }
 
+.tile.tile-with-assignee {
+  min-height: 120px;
+  max-height: none;
+}
+
+.tile-with-assignee .printer-info {
+  contain: inline-size;
+}
+
 .colored-tile {
   padding: 8px;
   color: #ffffff;
@@ -612,6 +660,20 @@ const selectPrinterPosition = async () => {
 .tile-selected {
   outline: 2px solid rgb(var(--v-theme-primary));
   opacity: 1;
+}
+
+.tile-status-colored .printer-title {
+  color: var(--grid-status-text-color);
+}
+
+.tile-status-colored.tile-selected {
+  outline-color: var(--grid-status-text-color);
+  outline-offset: 1px;
+}
+
+.tile-status-colored .file-name,
+.tile-status-colored .progress-bar {
+  background-color: #262626;
 }
 
 .tile.tile-no-printer {
@@ -724,6 +786,10 @@ const selectPrinterPosition = async () => {
   color: #ffffff;
   white-space: nowrap;
   line-height: 1.3;
+}
+
+.print-assignee {
+  font-weight: 600;
 }
 
 .centered-controls {

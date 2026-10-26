@@ -43,7 +43,7 @@ const batchReprintFiles = async () => {
   )
   console.log('[PrinterGridView] Dialog completed', output)
 }
-const uploadFile = (startPrint: boolean) => {
+const uploadFile = async (startPrint: boolean) => {
   const selectedPrintersValue = selectedPrinters.value
   const accessiblePrinters = selectedPrintersValue.filter((p) =>
     printerStateStore.isApiResponding(p.id)
@@ -66,7 +66,13 @@ const uploadFile = (startPrint: boolean) => {
     selectedFile.value,
     startPrint
   )
-  uploadsStore.queueUploads(uploads)
+  try {
+    if (!await uploadsStore.queueUploads(uploads)) return
+  } catch (error) {
+    console.error('Could not prepare upload:', error)
+    snackbar.openErrorMessage({ title: 'Could not prepare upload', subtitle: String(error) })
+    return
+  }
 
   if (fileUpload.value) {
     fileUpload.value.value = ''

@@ -17,7 +17,7 @@
         :key="f.id"
         size="small"
       >
-        <v-icon>layers</v-icon>
+        <v-icon>{{ settingsStore.serverSettings?.floorGridLockEnabled && f.gridProtected ? 'lock' : 'layers' }}</v-icon>
         {{ f.name }}
       </v-btn>
     </v-btn-toggle>
@@ -67,7 +67,7 @@
 
     <!-- Auto Place button -->
     <v-btn
-      v-if="floorStore.floorlessPrinters.length"
+      v-if="profileStore.isAdmin && !gridLocked && floorStore.floorlessPrinters.length"
       color="primary"
       variant="elevated"
       size="small"
@@ -80,7 +80,7 @@
     </v-btn>
 
     <!-- Unplaced printers menu -->
-    <v-menu v-if="floorStore.floorlessPrinters.length" :close-on-content-click="false">
+    <v-menu v-if="profileStore.isAdmin && !gridLocked && floorStore.floorlessPrinters.length" :close-on-content-click="false">
       <template v-slot:activator="{ props }">
         <v-btn
           v-bind="props"
@@ -126,10 +126,10 @@
     <v-spacer/>
 
     <!-- Grid size controls - always visible -->
-    <GridSizeControl class="ml-4"/>
+    <GridSizeControl v-if="profileStore.isAdmin" class="ml-4"/>
 
     <!-- Grid settings menu -->
-    <GridSettingsMenu class="ml-4"/>
+    <GridSettingsMenu v-if="profileStore.isAdmin" class="ml-4"/>
   </v-toolbar>
 </template>
 
@@ -138,6 +138,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useGridStore } from '@/store/grid.store'
 import { useFloorStore } from '@/store/floor.store'
 import { useSettingsStore } from '@/store/settings.store'
+import { useProfileStore } from '@/store/profile.store'
 import { usePrinterFilters } from '@/shared/printer-filter.composable'
 import PrinterTagFilter from '@/components/Generic/Filters/PrinterTagFilter.vue'
 import PrinterTypeFilter from '@/components/Generic/Filters/PrinterTypeFilter.vue'
@@ -147,9 +148,11 @@ import { dragAppId, INTENT, PrinterPlace } from '@/shared/drag.constants'
 import { getPrinterTypeName } from '@/shared/printer-types.constants'
 import type { PrinterDto } from '@/models/printers/printer.model'
 
+defineProps<{ gridLocked?: boolean }>()
 const floorStore = useFloorStore()
 const gridStore = useGridStore()
 const settingsStore = useSettingsStore()
+const profileStore = useProfileStore()
 const autoPlacing = ref(false)
 
 const {

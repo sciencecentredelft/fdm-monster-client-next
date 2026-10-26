@@ -19,17 +19,18 @@
 
     <!-- Show normal grid when floors exist -->
     <template v-else>
-      <HomeToolbar/>
+      <HomeToolbar :grid-locked="gridLocked"/>
 
-      <UploadToolbar/>
-
-      <PrinterGrid class="ma-2"/>
+      <FloorGridLock @update:locked="onGridLockChanged">
+        <UploadToolbar/>
+        <PrinterGrid class="ma-2"/>
+      </FloorGridLock>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useFloorStore } from '@/store/floor.store'
 import { useDialog } from '@/shared/dialog.composable'
@@ -37,9 +38,16 @@ import { DialogName } from '@/components/Generic/Dialogs/dialog.constants'
 import HomeToolbar from './HomeToolbar.vue'
 import UploadToolbar from './UploadToolbar.vue'
 import PrinterGrid from './PrinterGrid.vue'
+import FloorGridLock from './FloorGridLock.vue'
+import { usePrinterStore } from '@/store/printer.store'
 
 const route = useRoute()
 const floorStore = useFloorStore()
+const gridLocked = ref(true)
+function onGridLockChanged(locked: boolean) {
+  gridLocked.value = locked
+  if (locked) usePrinterStore().clearSelectedPrinters()
+}
 const addFloorDialog = useDialog(DialogName.AddOrUpdateFloorDialog)
 
 onMounted(() => {

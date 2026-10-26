@@ -7,6 +7,7 @@ import {
 import { usePrinterStore } from './printer.store'
 import { PrinterRemoteFileService } from '@/backend'
 import { useSettingsStore } from './settings.store'
+import { confirmPrintAssignment } from '@/shared/print-assignment.composable'
 import { CurrentOrHistoryPayload } from '@/models/printers/printer-current-job.model'
 import {
   isPrinterIdling,
@@ -240,7 +241,12 @@ export const usePrinterStateStore = defineStore('PrinterState', {
         return
       }
 
-      await PrinterRemoteFileService.selectAndPrintFile(printerId, fullPath, true)
+      const assignedTo = await confirmPrintAssignment([{
+        printerId, printerName: printer.name, fileName: fullPath, existingFile: true
+      }])
+      if (assignedTo === null) return
+      await PrinterRemoteFileService.selectAndPrintFile(printerId, fullPath, true, assignedTo)
+      return true
     }
   }
 })

@@ -37,6 +37,7 @@
     <ManageTagsDialog />
     <FileExplorerSideNav />
     <BatchReprintDialog />
+    <PrintAssignmentDialog />
     <PrinterControlDialog />
     <JsonViewerDialog />
     <PrintJobDetailsDialog />

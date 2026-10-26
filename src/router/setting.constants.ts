@@ -15,6 +15,8 @@ export const settingPage = {
   about: "about",
 } as const;
 
+export const personalSettingsPaths = new Set(["/settings/account", "/settings/about"]);
+
 export const settingsPage = {
   [settingPage.floors]: {
     title: "Floors",

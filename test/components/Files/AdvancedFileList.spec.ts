@@ -50,6 +50,31 @@ afterEach(() => {
 })
 
 describe('AdvancedFileList', () => {
+  it('shows, sorts, and searches assignments only when that column is configured, even without dates', async () => {
+    vi.mocked(PrinterRemoteFileService.getLastPrintStarts).mockResolvedValue([
+      { ...starts[0], assignedTo: 'Alice' },
+      { ...starts[1], assignedTo: 'Bob' }
+    ])
+    const wrapper = render({ columns: { size: false, startedAt: false, assignedTo: true } })
+    await flushPromises()
+    expect(PrinterRemoteFileService.getLastPrintStarts).toHaveBeenCalledWith(1)
+    expect(wrapper.text()).toContain('Assigned to')
+    expect(wrapper.text()).not.toContain('Last print started')
+    await sortColumn(wrapper, 'Assigned to')
+    expect(displayedNames(wrapper).filter(name => name !== 'never.gcode')).toEqual(['zebra.gcode', 'alpha.gcode'])
+    await sortColumn(wrapper, 'Assigned to')
+    expect(displayedNames(wrapper).filter(name => name !== 'never.gcode')).toEqual(['alpha.gcode', 'zebra.gcode'])
+    await wrapper.get('input[aria-label="Search files"]').setValue(' aLiCe ')
+    expect(displayedNames(wrapper)).toEqual(['zebra.gcode'])
+    await wrapper.setProps({ columns: { size: false, startedAt: false, assignedTo: false } })
+    await flushPromises()
+    expect(displayedNames(wrapper)).toEqual([])
+    expect(wrapper.text()).not.toContain('Assigned to')
+    await wrapper.get('input[aria-label="Search files"]').setValue('')
+    expect(displayedNames(wrapper)).toEqual(['alpha.gcode', 'never.gcode', 'zebra.gcode'])
+    wrapper.unmount()
+  })
+
   it('sorts names, numeric sizes, and actual print timestamps in both directions', async () => {
     const wrapper = render()
     await flushPromises()
@@ -149,12 +174,12 @@ describe('AdvancedFileList', () => {
     vi.mocked(PrinterRemoteFileService.getLastPrintStarts).mockRejectedValueOnce(new Error('Network unavailable'))
     const wrapper = render()
     await flushPromises()
-    expect(wrapper.text()).toContain('Could not load print start dates')
+    expect(wrapper.text()).toContain('Could not load print history')
     expect(wrapper.text()).toContain('Unavailable')
     const retry = wrapper.findAll('button').find(button => button.text() === 'Retry')!
     await retry.trigger('click')
     await flushPromises()
-    expect(wrapper.text()).not.toContain('Could not load print start dates')
+    expect(wrapper.text()).not.toContain('Could not load print history')
     expect(wrapper.text()).toContain(new Date(starts[0].startedAt).toLocaleDateString())
     wrapper.unmount()
   })

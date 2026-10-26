@@ -25,7 +25,7 @@
           />
         </div>
         <v-spacer/>
-        <div class="d-flex align-center ga-2">
+        <div v-if="profileStore.isAdmin" class="d-flex align-center ga-2">
           <v-btn
             variant="elevated"
             color="purple"
@@ -71,18 +71,20 @@
       >
         <template #no-data>
           <div class="mt-4 mb-4">
-            <h3 v-if="printers.length === 0">
+            <h3 v-if="printers.length === 0 && profileStore.isAdmin">
               No printer has been created yet. Create one here:
             </h3>
+            <h3 v-else-if="printers.length === 0">No printers are available.</h3>
             <h3 v-else>
               No printer has been found. Adjust your filters or search criteria.
             </h3>
-            <PrinterCreateAction/>
+            <PrinterCreateAction v-if="profileStore.isAdmin"/>
           </div>
         </template>
         <template #item.enabled="{ item }">
           <v-switch
             v-model="item.enabled"
+            :disabled="!profileStore.isAdmin"
             color="primary"
             inset
             @click.native.capture.stop="toggleEnabled(item)"
@@ -102,9 +104,9 @@
           <div class="d-flex align-center ga-1">
             <v-chip
               v-if="floorOfPrinter(item.id)"
-              closable
+              :closable="profileStore.isAdmin"
               size="small"
-              @click="openFloorEditDialog(floorOfPrinter(item.id)?.id)"
+              @click="profileStore.isAdmin && openFloorEditDialog(floorOfPrinter(item.id)?.id)"
               @click:close="removePrinterFromFloor(item.id)"
             >
               <v-icon start size="x-small">layers</v-icon>
@@ -136,13 +138,14 @@
                   </v-list-item-title>
                 </v-list-item>
                 <v-list-item
-                  v-if="floorOfPrinter(item.id)"
+                  v-if="profileStore.isAdmin && floorOfPrinter(item.id)"
                   prepend-icon="edit"
                   @click="openFloorEditDialog(floorOfPrinter(item.id)?.id)"
                 >
                   <v-list-item-title>Edit Floor</v-list-item-title>
                 </v-list-item>
                 <v-list-item
+                  v-if="profileStore.isAdmin"
                   prepend-icon="settings"
                   @click="goToFloorSettings()"
                 >
@@ -159,8 +162,8 @@
               :key="camera.id"
               size="x-small"
               variant="tonal"
-              closable
-              @click="openCameraEditDialog(camera.id)"
+              :closable="profileStore.isAdmin"
+              @click="profileStore.isAdmin && openCameraEditDialog(camera.id)"
               @click:close="detachCameraFromPrinter(camera.id)"
             >
               <v-icon start size="x-small">videocam</v-icon>
@@ -177,7 +180,7 @@
               No cameras
             </span>
 
-            <v-menu>
+            <v-menu v-if="profileStore.isAdmin">
               <template #activator="{ props }">
                 <v-btn
                   v-bind="props"
@@ -217,15 +220,15 @@
               :color="tag.color"
               size="small"
               variant="tonal"
-              closable
-              @click="openManageTagsDialogAndEdit(tag.id)"
+              :closable="profileStore.isAdmin"
+              @click="profileStore.isAdmin && openManageTagsDialogAndEdit(tag.id)"
               @click:close="deletePrinterFromTag(tag.id, item.id)"
             >
               <v-icon start size="x-small">label</v-icon>
               {{ tag.name }}
             </v-chip>
 
-            <v-menu>
+            <v-menu v-if="profileStore.isAdmin">
               <template #activator="{ props }">
                 <v-btn
                   v-bind="props"
@@ -270,15 +273,16 @@
             <div class="d-flex ga-1">
               <FileExplorerAction :printer="item"/>
               <PrinterSettingsAction
+                v-if="profileStore.isAdmin"
                 :printer="item"
                 @update:show="openEditDialog(item)"
               />
-              <PrinterDeleteAction :printer="item"/>
+              <PrinterDeleteAction v-if="profileStore.isAdmin" :printer="item"/>
               <PrinterMaintenanceAction :printer="item"/>
               <PrinterUrlAction :printer="item"/>
               <PrinterQuickStopAction :printer="item"/>
               <PrinterConnectionAction :printer="item"/>
-              <SyncPrinterNameAction :printer="item"/>
+              <SyncPrinterNameAction v-if="profileStore.isAdmin" :printer="item"/>
             </div>
           </div>
         </template>
@@ -314,6 +318,7 @@ import PrinterMaintenanceAction from '@/components/Generic/Actions/PrinterMainte
 import FileExplorerAction from '@/components/Generic/Actions/FileExplorerAction.vue'
 import SyncPrinterNameAction from '@/components/Generic/Actions/SyncPrinterNameAction.vue'
 import { usePrinterStore } from '@/store/printer.store'
+import { useProfileStore } from '@/store/profile.store'
 import { DialogName } from '@/components/Generic/Dialogs/dialog.constants'
 import PrinterCreateAction from '@/components/Generic/Actions/PrinterCreateAction.vue'
 import PrinterDeleteAction from '@/components/Generic/Actions/PrinterDeleteAction.vue'
@@ -334,6 +339,7 @@ import { usePrinterFilters } from '@/shared/printer-filter.composable'
 const snackbar = useSnackbar()
 const router = useRouter()
 const printerStore = usePrinterStore()
+const profileStore = useProfileStore()
 const loading = ref<boolean>(false)
 const printerStateStore = usePrinterStateStore()
 const floorStore = useFloorStore()

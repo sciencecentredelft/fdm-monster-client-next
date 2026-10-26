@@ -67,6 +67,7 @@ export interface PrintJobDto {
   printerId: number | null
   printerName: string | null
   fileName: string
+  assignedTo?: string | null
   fileFormat: FileFormatType | null
   fileStorageId: string | null
   fileHash: string | null

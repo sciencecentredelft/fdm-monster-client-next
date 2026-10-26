@@ -1,4 +1,5 @@
 export enum DialogName {
+  PrintAssignmentDialog = 'PrintAssignmentDialog',
   // The JSON import dialog, which is used to import a JSON file with a printer array into the application.
   ImportOctoFarmDialog = 'ImportOctoFarmDialog',
   // Stateful dialog meant for verifying the last printed file of each selected printer

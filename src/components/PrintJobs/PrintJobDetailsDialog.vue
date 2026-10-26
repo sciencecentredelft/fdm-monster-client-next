@@ -70,6 +70,10 @@
                       <div class="text-caption text-medium-emphasis">File Name</div>
                       <div class="text-body-2 font-weight-medium">{{ job?.fileName }}</div>
                     </v-col>
+                    <v-col v-if="job?.assignedTo" cols="12" md="6">
+                      <div class="text-caption text-medium-emphasis">Assigned to</div>
+                      <div class="text-body-2 font-weight-medium">{{ job.assignedTo }}</div>
+                    </v-col>
                   </v-row>
                 </v-card-text>
               </v-card>
@@ -822,4 +826,3 @@ const copyToClipboard = async () => {
   border-color: rgba(var(--v-theme-on-surface), 0.12) !important;
 }
 </style>
-

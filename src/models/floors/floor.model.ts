@@ -5,6 +5,8 @@ export interface FloorDto {
   name: string;
   order: number;
   printers: PositionDto[];
+  gridProtected?: boolean;
+  gridLockVersion?: string | null;
 }
 
 export interface PreCreateFloor {

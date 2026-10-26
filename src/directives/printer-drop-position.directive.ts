@@ -4,6 +4,7 @@ import {
 } from '@/shared/drag.constants'
 import { FloorService } from '@/backend/floor.service'
 import { useFloorStore } from '@/store/floor.store'
+import { useProfileStore } from '@/store/profile.store'
 import { PrinterDto } from '@/models/printers/printer.model'
 import { AppContext, Directive } from 'vue'
 
@@ -27,6 +28,7 @@ const bindDropConditionally = (
 
   el.style.border = defaultBorder
   el.ondrop = async (e) => {
+    if (!useProfileStore().isAdmin) return
     el.style.border = defaultBorder
     e.preventDefault()
     if (!e.dataTransfer) {
@@ -74,6 +76,7 @@ const bindDropConditionally = (
     })
   }
   el.ondragover = (ev: DragEvent) => {
+    if (!useProfileStore().isAdmin) return
     if (!ev?.dataTransfer) {
       return
     }

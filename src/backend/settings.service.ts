@@ -8,7 +8,37 @@ import {
   SettingsSensitiveDto
 } from '@/models/settings/settings.model'
 
+import type { GridStatusColors } from '@/shared/grid-status-colors'
+
 export class SettingsService extends BaseService {
+  static async updateFloorGridLock(enabled: boolean) {
+    return await this.put<SettingsDto>(`${ServerApi.settingsRoute}/floor-grid-lock`, { enabled })
+  }
+
+  static async updateGridStatusColors(enabled: boolean, colors: GridStatusColors) {
+    return await this.put<SettingsDto>(
+      `${ServerApi.settingsRoute}/grid-status-colors`, { enabled, colors }
+    )
+  }
+
+  static async updatePrePrintStatusCheck(enabled: boolean) {
+    return await this.put<SettingsDto>(
+      `${ServerApi.settingsRoute}/pre-print-status-check`, { enabled }
+    )
+  }
+
+  static async updatePrintAssigneeGrid(enabled: boolean) {
+    return await this.put<SettingsDto>(
+      `${ServerApi.settingsRoute}/print-assignee-grid`, { enabled }
+    )
+  }
+
+  static async updatePrintAssignment(enabled: boolean) {
+    return await this.put<SettingsDto>(
+      `${ServerApi.settingsRoute}/print-assignment`, { enabled }
+    )
+  }
+
   static async updateAdvancedFileList(enabled: boolean, columns?: AdvancedFileListColumns) {
     return await this.put<SettingsDto>(
       `${ServerApi.settingsRoute}/advanced-file-list`,

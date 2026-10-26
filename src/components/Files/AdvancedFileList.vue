@@ -12,7 +12,7 @@
       class="mb-3 flex-shrink-0"
     />
     <v-alert v-if="historyError" type="error" variant="tonal" density="compact" class="mb-2">
-      Could not load print start dates.
+      Could not load print history.
       <v-btn variant="text" size="small" @click="loadPrintStarts">Retry</v-btn>
     </v-alert>
     <v-data-table-virtual
@@ -52,6 +52,9 @@
         <span :title="item.dateTitle">
           {{ item.dateLabel }}
         </span>
+      </template>
+      <template #item.assignedTo="{ item }">
+        {{ item.assignmentLabel }}
       </template>
       <template #item.actions="{ item }">
         <div v-if="!item.file.dir" class="d-flex">
@@ -113,10 +116,12 @@ const headers = computed(() => [
   { title: 'Name', key: 'name' },
   { title: 'Size', key: 'size' },
   { title: 'Last print started', key: 'startedAt' },
+  { title: 'Assigned to', key: 'assignedTo' },
   { title: 'Actions', key: 'actions', sortable: false }
 ].filter(header => {
   if (header.key === 'size') return props.columns.size
   if (header.key === 'startedAt') return props.columns.startedAt
+  if (header.key === 'assignedTo') return props.columns.assignedTo === true
   return true
 }))
 const sortBy = ref<{ key: string; order: 'asc' | 'desc' }[]>([{ key: 'name', order: 'asc' }])
@@ -130,7 +135,7 @@ async function loadPrintStarts() {
   const version = ++requestVersion
   printStarts.value = []
   historyError.value = false
-  if (!props.columns.startedAt) {
+  if (!props.columns.startedAt && !props.columns.assignedTo) {
     historyLoading.value = false
     return
   }
@@ -147,7 +152,7 @@ async function loadPrintStarts() {
   }
 }
 
-watch(() => [props.printerId, props.files, props.columns.startedAt], loadPrintStarts, { immediate: true })
+watch(() => [props.printerId, props.files, props.columns.startedAt, props.columns.assignedTo, props.currentPrintingFilePath], loadPrintStarts, { immediate: true })
 watch(() => props.printerId, () => {
   search.value = ''
 })
@@ -160,6 +165,7 @@ onBeforeUnmount(() => { requestVersion++ })
 
 const filteredFiles = computed(() => {
   const startsByPath = new Map(printStarts.value.map(start => [start.fileName, Date.parse(start.startedAt)]))
+  const assignmentsByPath = new Map(printStarts.value.map(start => [start.fileName, start.assignedTo]))
   const matches = (text: string, query: string | null) =>
     text.toLowerCase().includes((query ?? '').trim().toLowerCase())
 
@@ -171,6 +177,9 @@ const filteredFiles = computed(() => {
     if (historyError.value) dateLabel = 'Unavailable'
     if (date) dateLabel = date.toLocaleDateString()
     if (file.dir) dateLabel = '-'
+    const assignedTo = file.dir ? null : assignmentsByPath.get(file.path) ?? null
+    const assignmentLabel = file.dir ? '-' : historyLoading.value ? 'Loading...'
+      : historyError.value ? 'Unavailable' : assignedTo || 'Not assigned'
 
     return {
       file,
@@ -178,6 +187,8 @@ const filteredFiles = computed(() => {
       name: file.path.split('/').pop() || file.path,
       size: file.size,
       startedAt,
+      assignedTo,
+      assignmentLabel,
       dateLabel,
       dateTitle: date?.toLocaleString(),
       dateSearchText: date ? `${dateLabel} ${date.toLocaleString()} ${date.toISOString()}` : dateLabel
@@ -187,6 +198,7 @@ const filteredFiles = computed(() => {
       || (props.columns.size && !item.file.dir
         && matches(`${item.size ?? ''} ${formatFileSize(item.size ?? undefined)}`, search.value))
       || (props.columns.startedAt && !item.file.dir && matches(item.dateSearchText, search.value))
+      || (props.columns.assignedTo && !item.file.dir && matches(item.assignmentLabel, search.value))
   })
 })
 </script>

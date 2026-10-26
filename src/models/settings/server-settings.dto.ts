@@ -1,6 +1,9 @@
+import type { GridStatusColors } from '@/shared/grid-status-colors'
+
 export interface AdvancedFileListColumns {
   size: boolean
   startedAt: boolean
+  assignedTo?: boolean
 }
 
 export interface ServerSettingsDto {
@@ -11,5 +14,11 @@ export interface ServerSettingsDto {
   experimentalPrusaLinkSupport: boolean
   experimentalBambuSupport: boolean
   advancedFileListEnabled?: boolean
+  printAssignmentEnabled?: boolean
+  showPrintAssigneeOnGrid?: boolean
+  checkPrinterStatusBeforePrint?: boolean
+  gridStatusColorsEnabled?: boolean
+  floorGridLockEnabled?: boolean
+  gridStatusColors?: GridStatusColors
   advancedFileListColumns?: AdvancedFileListColumns
 }

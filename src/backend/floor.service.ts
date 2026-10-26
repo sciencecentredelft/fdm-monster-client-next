@@ -4,6 +4,16 @@ import { newRandomNamePair } from "@/shared/noun-adjectives.data";
 import { FloorDto, getDefaultCreateFloor, PreCreateFloor } from "@/models/floors/floor.model";
 
 export class FloorService extends BaseService {
+  static async setGridPassword(floorId: number, password: string | null) {
+    return await this.put<FloorDto>(`${ServerApi.floorRoute}/${floorId}/grid-password`, { password });
+  }
+
+  static async unlockGrid(floorId: number, password: string) {
+    return await this.post<{ unlocked: boolean; gridLockVersion: string | null }>(
+      `${ServerApi.floorRoute}/${floorId}/grid-unlock`, { password }
+    );
+  }
+
   static convertPrinterFloorToCreateForm(printerFloor?: FloorDto): PreCreateFloor {
     // Inverse transformation
     const newFormData = getDefaultCreateFloor();

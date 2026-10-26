@@ -72,6 +72,10 @@
               </div>
 
               <!-- Manage on grid button -->
+              <FloorGridPasswordSettings
+                v-if="settingsStore.serverSettings?.floorGridLockEnabled && profileStore.isAdmin"
+                :floor="floor"
+              />
               <div class="mb-4">
                 <v-btn
                   color="primary"
@@ -145,9 +149,14 @@ import { useDialog } from '@/shared/dialog.composable'
 import { DialogName } from '@/components/Generic/Dialogs/dialog.constants'
 import SettingSection from '@/components/Settings/Shared/SettingSection.vue'
 import { FloorDto } from '@/models/floors/floor.model'
+import FloorGridPasswordSettings from '@/components/Settings/FloorGridPasswordSettings.vue'
+import { useSettingsStore } from '@/store/settings.store'
+import { useProfileStore } from '@/store/profile.store'
 
 const router = useRouter()
 const floorStore = useFloorStore()
+const settingsStore = useSettingsStore()
+const profileStore = useProfileStore()
 const printerStore = usePrinterStore()
 const snackbar = useSnackbar()
 const addOrUpdateFloorDialog = useDialog(DialogName.AddOrUpdateFloorDialog)

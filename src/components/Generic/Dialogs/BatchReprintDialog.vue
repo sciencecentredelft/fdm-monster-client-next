@@ -120,6 +120,7 @@ import { ReprintFileDto, ReprintState } from '@/models/batch/reprint.dto'
 import { usePrinterStore } from '@/store/printer.store'
 import { errorSummary } from '@/utils/error.utils'
 import { useSnackbar } from '@/shared/snackbar.composable'
+import { confirmPrintAssignment } from '@/shared/print-assignment.composable'
 
 const printerStore = usePrinterStore()
 const inputPrinterIds = ref()
@@ -157,14 +158,27 @@ async function onDialogOpened(printerIds: number[]) {
 async function submitBatchReprints() {
   submitting.value = true
   try {
-    await BatchService.batchReprintFiles(
-      selectedItems.value
-        .filter((v) => v.file?.path)
-        .map((v) => ({
-          printerId: v.printerId,
-          path: v.file?.path || ''
-        }))
+    const prints = selectedItems.value
+      .filter(v => v.file?.path)
+      .map(v => ({ printerId: v.printerId, path: v.file?.path || '' }))
+    const assignedTo = await confirmPrintAssignment(prints.map(print => ({
+      printerId: print.printerId,
+      printerName: printerStore.printer(print.printerId)?.name ?? `Printer #${print.printerId}`,
+      fileName: print.path,
+      existingFile: true
+    })))
+    if (assignedTo === null) return
+    const results = await BatchService.batchReprintFiles(
+      prints, assignedTo
     )
+    const failures = results.filter(result => result.failure)
+    if (failures.length) {
+      errorLoading.value = failures.map(result =>
+        `${printerStore.printer(result.printerId)?.name ?? `Printer #${result.printerId}`}: ${result.error || 'Print start failed'}`
+      ).join('; ')
+      snackbar.openErrorMessage({ title: 'Some prints could not start', subtitle: errorLoading.value })
+      return
+    }
     printerStore.clearSelectedPrinters()
     snackbar.info('Action completed', 'Your reprinted jobs are starting', 5000)
     closeDialog()

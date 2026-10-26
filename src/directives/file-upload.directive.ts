@@ -60,7 +60,13 @@ const bindDropConditionally = (
         convertedUploads = convertMultiPrinterFileToQueue(printers, clonedFile, true)
       }
 
-      uploadsStore.queueUploads(convertedUploads)
+      try {
+        if (!await uploadsStore.queueUploads(convertedUploads)) return
+      } catch (error) {
+        console.error('Could not prepare upload:', error)
+        snackbar.openErrorMessage({ title: 'Could not prepare upload', subtitle: String(error) })
+        return
+      }
 
       printersStore.clearSelectedPrinters()
     }

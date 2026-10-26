@@ -46,7 +46,7 @@
               {{ permissionProblems?.page }}
             </strong>
           </div>
-          <div v-if="permissionProblems.permissions">
+          <div v-if="permissionProblems.permissions?.length">
             Required permission(s):
             <strong
               v-for="perm of permissionProblems.permissions"
@@ -55,7 +55,7 @@
               {{ perm }}
             </strong>
           </div>
-          <div v-if="permissionProblems.roles">
+          <div v-if="permissionProblems.roles.length">
             Usable roles:
             <strong>
               {{ permissionProblems.roles?.join(', ') }}
@@ -91,7 +91,7 @@
 </template>
 <script lang="ts" setup>
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, type LocationQueryValue } from 'vue-router'
 
 const route = useRoute()
 
@@ -103,7 +103,15 @@ interface PermissionDeniedQuery {
   error?: string
 }
 
-const permissionProblems = computed(() => {
-  return route.query as any as PermissionDeniedQuery
-})
+function queryValues(value: LocationQueryValue | LocationQueryValue[] | undefined): string[] {
+  return (Array.isArray(value) ? value : [value]).filter((entry): entry is string => typeof entry === 'string')
+}
+
+const permissionProblems = computed<PermissionDeniedQuery>(() => ({
+  roles: queryValues(route.query.roles),
+  permissions: queryValues(route.query.permissions),
+  url: queryValues(route.query.url)[0],
+  page: queryValues(route.query.page)[0],
+  error: queryValues(route.query.error)[0]
+}))
 </script>

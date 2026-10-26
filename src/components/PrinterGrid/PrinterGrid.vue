@@ -24,7 +24,7 @@
 
     <!-- Drop zone for removing printers from grid - only show when dragging placed printers -->
     <div
-      v-show="isDraggingPlacedPrinter"
+      v-show="profileStore.isAdmin && isDraggingPlacedPrinter"
       class="remove-drop-zone"
       @dragover.prevent
       @dragenter.prevent="onDragEnterRemove"
@@ -54,11 +54,13 @@ import { useFloorStore } from '@/store/floor.store'
 import { FloorService } from '@/backend/floor.service'
 import { usePrinterFilters } from '@/shared/printer-filter.composable'
 import { useGridStore } from '@/store/grid.store'
+import { useProfileStore } from '@/store/profile.store'
 
 const printerStore = usePrinterStore()
 const floorStore = useFloorStore()
 const settingsStore = useSettingsStore()
 const gridStore = useGridStore()
+const profileStore = useProfileStore()
 const isDragging = ref(false)
 const isDraggingPlacedPrinter = ref(false)
 const isOverRemoveZone = ref(false)
@@ -130,6 +132,7 @@ function onDragLeaveRemove() {
 }
 
 async function onDropRemove(ev: DragEvent) {
+  if (!profileStore.isAdmin) return
   isOverRemoveZone.value = false
 
   if (!ev.dataTransfer) return

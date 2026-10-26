@@ -9,6 +9,7 @@
         >
           <div class="d-flex align-center ga-2">
             <v-btn
+              v-if="profileStore.isAdmin"
               color="primary"
               variant="elevated"
               @click="addCamera()"
@@ -161,7 +162,7 @@
       <v-row v-else>
         <!-- Empty Tile - Get Started -->
         <v-col
-          v-if="!query.data.value?.length"
+          v-if="profileStore.isAdmin && !query.data.value?.length"
           cols="12"
           sm="6"
           md="4"
@@ -292,6 +293,7 @@
             <!-- Card Actions -->
             <v-card-actions class="pa-3">
               <v-btn
+                v-if="profileStore.isAdmin"
                 variant="text"
                 size="small"
                 @click="updateCamera(camera.cameraStream.id)"
@@ -311,6 +313,7 @@
               </v-btn>
               <v-spacer />
               <v-btn
+                v-if="profileStore.isAdmin"
                 variant="text"
                 size="small"
                 color="error"
@@ -336,6 +339,7 @@ import { DialogName } from '@/components/Generic/Dialogs/dialog.constants'
 import { useMutation, useQuery } from '@tanstack/vue-query'
 import { CameraWithPrinter } from '@/models/camera-streams/camera-stream'
 import { usePrinterStore } from '@/store/printer.store'
+import { useProfileStore } from '@/store/profile.store'
 import { useFileExplorer } from '@/shared/file-explorer.composable'
 import type { PrinterDto } from '@/models/printers/printer.model'
 import { getPrinterTypeName } from '@/shared/printer-types.constants'
@@ -345,6 +349,7 @@ import PrinterTypeFilter from '@/components/Generic/Filters/PrinterTypeFilter.vu
 
 const route = useRoute()
 const printerStore = usePrinterStore()
+const profileStore = useProfileStore()
 const dialog = useDialog(DialogName.AddOrUpdateCameraDialog)
 const fileExplorer = useFileExplorer()
 

@@ -20,7 +20,8 @@
       </v-navigation-drawer>
 
       <v-col>
-        <router-view />
+        <router-view v-if="profileStore.isAdmin || personalSettingsPaths.has(route.path)" />
+        <v-alert v-else type="warning" variant="tonal">Administrator access is required to change server settings.</v-alert>
       </v-col>
     </v-row>
   </div>
@@ -28,10 +29,12 @@
 
 <script lang="ts" setup>
 import { computed, onMounted } from 'vue'
-import { settingPage, settingsPage } from '@/router/setting.constants'
+import { personalSettingsPaths, settingsPage } from '@/router/setting.constants'
+import { useRoute } from 'vue-router'
 import { useProfileStore } from '@/store/profile.store'
 
 const profileStore = useProfileStore()
+const route = useRoute()
 
 // Make sure we have profile info to drive admin-only filtering.
 onMounted(async () => {
@@ -44,14 +47,7 @@ onMounted(async () => {
   }
 })
 
-// Filter out admin-only settings entries when the user lacks ADMIN.
-const ADMIN_ONLY = new Set<string>([settingPage.apiKeys])
-const visibleItems = computed(() => {
-  if (profileStore.isAdmin) return settingsPage
-  const filtered: Record<string, (typeof settingsPage)[keyof typeof settingsPage]> = {}
-  for (const [key, value] of Object.entries(settingsPage)) {
-    if (!ADMIN_ONLY.has(key)) filtered[key] = value
-  }
-  return filtered as typeof settingsPage
-})
+const visibleItems = computed(() => Object.values(settingsPage).filter(
+  item => profileStore.isAdmin || personalSettingsPaths.has(item.path)
+))
 </script>

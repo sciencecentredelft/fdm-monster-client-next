@@ -27,6 +27,7 @@ export interface SocketState {
 }
 
 export interface PrinterStateDto {
+  currentPrintAssignment?: { fileName: string; assignedTo: string | null } | null
   connected: {
     payload: any
     receivedAt: number
