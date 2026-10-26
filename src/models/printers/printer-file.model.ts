@@ -9,3 +9,8 @@ export interface FilesDto {
   dirs: FileDto[]
   files: FileDto[]
 }
+
+export interface LastPrintStartDto {
+  fileName: string
+  startedAt: string
+}

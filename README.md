@@ -5,6 +5,32 @@ This is the official scaffolding tool for Vuetify, designed to give you a head s
 ### Prerequisites
 - Backend server must be running at `http://127.0.0.1:4000`
 
+### Optional advanced printer file list
+
+An administrator can enable **Settings > Quality of Life > Enable advanced file list**.
+It is off by default; the normal printer file list is unchanged.
+
+The advanced list supports ascending/descending sorting and one search field
+across the visible **Name**, **Size**, and **Last print started** columns.
+Sort by clicking a column header. In Quality of Life settings, **Size** and
+**Last print started** can each be hidden; **Name** and **Actions** are always
+visible. Both optional columns are shown unless configured otherwise.
+The description and column controls appear only when the advanced list is enabled;
+disabling it preserves your saved column choices.
+Hidden columns are excluded from search. Hiding the currently sorted column
+resets sorting to Name. Print history is fetched only while its column is visible.
+Print-start dates use the latest recorded FDM Monster print job for that printer and
+exact file path, not the file's upload/modification date. Hover over a date to see its
+time in your local timezone. Files without a recorded start show **Not recorded**.
+The user who started a print is not included yet.
+
+Column visibility and the enable switch are shared server settings; sorting and
+search remain local list controls. Download, print,
+delete, folder navigation, and the protection against deleting/restarting the
+currently printing file remain available. **Experimental** remains a separate
+settings page at `/settings/experimental`, with its original printer-support controls.
+Quality of Life is an additional page at `/settings/quality-of-life`.
+
 ### Generate API Client
 
 ```bash

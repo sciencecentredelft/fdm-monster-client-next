@@ -1,11 +1,17 @@
 import { BaseService } from "@/backend/base.service";
 import { ServerApi } from "@/backend/server.api";
-import { FilesDto } from "@/models/printers/printer-file.model";
+import { FilesDto, LastPrintStartDto } from "@/models/printers/printer-file.model";
 import { PrinterDto } from "@/models/printers/printer.model";
 import { useSnackbar } from "@/shared/snackbar.composable";
 import { downloadFileByBlob } from "@/utils/download-file.util";
 
 export class PrinterRemoteFileService extends BaseService {
+  static async getLastPrintStarts(printerId: number) {
+    return await this.get<LastPrintStartDto[]>(
+      `${ServerApi.printerRemoteFilesRoute}/${printerId}/last-print-starts`
+    );
+  }
+
   static async getFiles(printerId: number, recursive = false, startDir?: string) {
     let path = `${ServerApi.printerRemoteFilesRoute}/${printerId}?recursive=${recursive}`;
     if (startDir) {

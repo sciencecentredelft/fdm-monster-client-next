@@ -22,6 +22,7 @@ import DiagnosticsSettings from '../components/Settings/DiagnosticsSettings.vue'
 import PrintJobsView from '../components/PrintJobs/PrintJobsView.vue'
 import MaintenanceLogsView from '../components/MaintenanceLogs/MaintenanceLogsView.vue'
 import FilesView from '../components/Files/FilesView.vue'
+import QualityOfLifeSettings from '@/components/Settings/QualityOfLifeSettings.vue'
 import ExperimentalSettings from '@/components/Settings/ExperimentalSettings.vue'
 import SlicerSettings from '@/components/Settings/SlicerSettings.vue'
 import ApiKeysSettings from '@/components/Settings/ApiKeysSettings.vue'
@@ -136,6 +137,11 @@ const router = createRouter({
           path: 'diagnostics',
           meta: NeedsAuth,
           component: DiagnosticsSettings
+        },
+        {
+          path: 'quality-of-life',
+          meta: NeedsAuth,
+          component: QualityOfLifeSettings
         },
         {
           path: 'experimental',

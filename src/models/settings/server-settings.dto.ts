@@ -1,3 +1,8 @@
+export interface AdvancedFileListColumns {
+  size: boolean
+  startedAt: boolean
+}
+
 export interface ServerSettingsDto {
   sentryDiagnosticsEnabled: boolean
   loginRequired: boolean
@@ -5,4 +10,6 @@ export interface ServerSettingsDto {
   experimentalMoonrakerSupport: boolean
   experimentalPrusaLinkSupport: boolean
   experimentalBambuSupport: boolean
+  advancedFileListEnabled?: boolean
+  advancedFileListColumns?: AdvancedFileListColumns
 }

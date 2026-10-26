@@ -1,5 +1,6 @@
 import { ServerApi } from '@/backend/server.api'
 import { BaseService } from '@/backend/base.service'
+import type { AdvancedFileListColumns } from '@/models/settings/server-settings.dto'
 import {
   FrontendSettings,
   SettingsDto,
@@ -8,6 +9,13 @@ import {
 } from '@/models/settings/settings.model'
 
 export class SettingsService extends BaseService {
+  static async updateAdvancedFileList(enabled: boolean, columns?: AdvancedFileListColumns) {
+    return await this.put<SettingsDto>(
+      `${ServerApi.settingsRoute}/advanced-file-list`,
+      { enabled, columns }
+    )
+  }
+
   static async getSettings() {
     const path = ServerApi.settingsRoute
     return await this.get<SettingsDto>(path)

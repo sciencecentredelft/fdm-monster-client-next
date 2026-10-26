@@ -8,6 +8,7 @@ export const settingPage = {
   softwareUpgrade: "softwareUpgrade",
   diagnostics: "diagnostics",
   experimental: "experimental",
+  qualityOfLife: "qualityOfLife",
   slicer: "slicer",
   apiKeys: "apiKeys",
   debugSocket: "debugSocket",
@@ -67,6 +68,12 @@ export const settingsPage = {
     title: "Experimental",
     icon: "settings_applications",
     path: "/settings/experimental",
+    divider: false,
+  },
+  [settingPage.qualityOfLife]: {
+    title: "Quality of Life",
+    icon: "settings_applications",
+    path: "/settings/quality-of-life",
     divider: false,
   },
   [settingPage.slicer]: {

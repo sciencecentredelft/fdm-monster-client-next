@@ -162,6 +162,7 @@ const pageTitle = computed(() => {
       '/settings/account': 'Settings - Account',
       '/settings/software-upgrade': 'Settings - Software Upgrade',
       '/settings/diagnostics': 'Settings - Diagnostics',
+      '/settings/quality-of-life': 'Settings - Quality of Life',
       '/settings/experimental': 'Settings - Experimental',
       '/settings/debug-socket': 'Settings - SocketIO Debug',
       '/settings/about': 'Settings - About'

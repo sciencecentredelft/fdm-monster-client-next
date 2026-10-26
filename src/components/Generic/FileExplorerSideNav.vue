@@ -300,6 +300,7 @@
 
         <!-- Search Field -->
         <v-text-field
+          v-if="!advancedFileListEnabled"
           v-model="fileSearch"
           placeholder="Search files..."
           prepend-inner-icon="search"
@@ -312,9 +313,21 @@
 
         <!-- File List -->
         <div class="file-list flex-grow-1">
+          <AdvancedFileList
+            v-if="advancedFileListEnabled && printerId"
+            :files="fileList ?? []"
+            :printer-id="printerId"
+            :columns="settingsStore.serverSettings?.advancedFileListColumns"
+            :loading="loading"
+            :current-printing-file-path="currentPrintingFilePath"
+            @navigate="navigateToDir"
+            @download="clickDownloadFile"
+            @print="clickPrintFile"
+            @delete="deleteFile"
+          />
           <!-- Loading State -->
           <div
-            v-if="loading"
+            v-else-if="loading"
             class="d-flex justify-center py-4"
           >
             <v-progress-circular
@@ -343,6 +356,7 @@
           <!-- File List (virtualized so an SD card with hundreds of gcodes
                stays responsive and the inner scroll is contained) -->
           <v-virtual-scroll
+            v-if="!advancedFileListEnabled"
             :items="fileTree"
             item-height="48"
             class="file-tree"
@@ -436,6 +450,8 @@ import {
 import { hasWebInterface } from '@/shared/printer-capabilities.constants'
 import { useDialog } from '@/shared/dialog.composable'
 import { useFileExplorer } from '@/shared/file-explorer.composable'
+import { useSettingsStore } from '@/store/settings.store'
+import AdvancedFileList from '@/components/Files/AdvancedFileList.vue'
 
 interface TreeNode {
   id: string
@@ -449,6 +465,8 @@ interface TreeNode {
 const printersStore = usePrinterStore()
 const printerStateStore = usePrinterStateStore()
 const fileExplorer = useFileExplorer()
+const settingsStore = useSettingsStore()
+const advancedFileListEnabled = computed(() => settingsStore.serverSettings?.advancedFileListEnabled === true)
 
 const fileSearch = ref<string | undefined>(undefined)
 const fileList = ref<FileDto[] | undefined>(undefined)
@@ -539,20 +557,24 @@ const currentPrintingFilePath = computed(() => {
   }
   return printerStateStore.printingFilePathsByPrinterId[printerId.value]
 })
+let fileRequestVersion = 0
 const refreshFiles = async () => {
-  fileExplorer.setLoading(true)
-  fileExplorer.setError(false)
+  const version = ++fileRequestVersion
   const currentPrinterId = printerId.value
   if (!currentPrinterId) return
+  fileExplorer.setLoading(true)
+  fileExplorer.setError(false)
   try {
     const startDir = currentPath.value || undefined
-    fileList.value = await printersStore.loadPrinterFiles(currentPrinterId, false, startDir)
+    const files = await printersStore.loadPrinterFiles(currentPrinterId, false, startDir)
+    if (version === fileRequestVersion) fileList.value = files
   } catch (error) {
+    if (version !== fileRequestVersion) return
     console.warn('Failed to load printer files:', error)
     fileExplorer.setError(true)
     fileList.value = []
   } finally {
-    fileExplorer.setLoading(false)
+    if (version === fileRequestVersion) fileExplorer.setLoading(false)
   }
 }
 
@@ -578,10 +600,10 @@ const deleteFile = async (file: FileDto) => {
 }
 
 watch(printerId, async (newPrinterId, oldPrinterId) => {
+  fileRequestVersion++
+  fileList.value = undefined
   if (newPrinterId && newPrinterId !== oldPrinterId) {
     await refreshFiles()
-  } else if (!newPrinterId) {
-    fileList.value = undefined
   }
 })
 
