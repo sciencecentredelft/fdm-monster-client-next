@@ -33,13 +33,15 @@ export const useUploadsStore = defineStore('Uploads', {
   actions: {
     async queueUploads(uploads: QueuedUpload[]) {
       const prints = uploads.filter(upload => upload.startPrint)
-      const assignedTo = prints.length ? await confirmPrintAssignment(prints.map(upload => ({
+      const assignee = prints.length ? await confirmPrintAssignment(prints.map(upload => ({
         printerId: upload.printer.id, printerName: upload.printer.name, fileName: upload.file.name
       }))) : undefined
-      if (assignedTo === null) return false
+      if (assignee === null) return false
       this.failedUploads = []
       this.queuedUploads.push(...uploads.map(upload => ({
-        ...upload, assignedTo: upload.startPrint ? assignedTo : undefined
+        ...upload,
+        assignedTo: upload.startPrint ? assignee?.name : undefined,
+        assignedEmail: upload.startPrint ? assignee?.email : undefined
       })))
       return true
     },
@@ -52,12 +54,12 @@ export const useUploadsStore = defineStore('Uploads', {
       // Dont upload when queue empty
       if (!this.queuedUploads?.length) return
       this.uploadingNow = true;
-      const { file, printer, startPrint, assignedTo } = this.nextUpload;
+      const { file, printer, startPrint, assignedTo, assignedEmail } = this.nextUpload;
       // We'd rather fail fast and avoid the same upload failing many times
       this.queuedUploads.splice(0, 1);
 
       try {
-        await PrinterRemoteFileService.uploadFile(printer, file, startPrint, assignedTo);
+        await PrinterRemoteFileService.uploadFile(printer, file, startPrint, assignedTo, assignedEmail);
       } catch (e: any) {
         if (e.isAxiosError) {
           const failedUpload: FailedQueuedUpload = {

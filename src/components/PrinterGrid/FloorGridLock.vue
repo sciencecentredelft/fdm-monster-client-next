@@ -26,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { FloorService } from '@/backend/floor.service'
 import { useFloorStore } from '@/store/floor.store'
 import { useSettingsStore } from '@/store/settings.store'
@@ -44,6 +44,36 @@ const checking = ref(false)
 const errorMessage = ref('')
 let requestVersion = 0
 const locked = computed(() => protectedView.value && !profileStore.isAdmin && !granted.value)
+const idleTimeoutMinutes = computed(() => settingsStore.serverSettings?.floorGridIdleTimeoutMinutes ?? 0)
+let lastActivityAt = Date.now()
+let idleTimer: ReturnType<typeof setTimeout> | undefined
+const activityEvents = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll'] as const
+
+function clearIdleTimer() {
+  clearTimeout(idleTimer)
+  idleTimer = undefined
+}
+
+function checkInactivity() {
+  clearIdleTimer()
+  if (locked.value || !protectedView.value || profileStore.isAdmin || idleTimeoutMinutes.value <= 0) return
+
+  const remaining = idleTimeoutMinutes.value * 60000 - (Date.now() - lastActivityAt)
+  if (remaining <= 0) {
+    lock()
+    return
+  }
+  // Long timeouts must not overflow the browser's signed 32-bit timer delay.
+  idleTimer = setTimeout(checkInactivity, Math.min(remaining, 2147483647))
+}
+
+function recordActivity() {
+  if (locked.value || !protectedView.value || profileStore.isAdmin || document.hidden) return
+  checkInactivity()
+  if (locked.value) return
+  lastActivityAt = Date.now()
+  checkInactivity()
+}
 
 function lock() {
   requestVersion++
@@ -61,6 +91,11 @@ watch([
   () => profileStore.isAdmin
 ], lock, { flush: 'sync' })
 watch(locked, value => emit('update:locked', value), { immediate: true, flush: 'sync' })
+watch([locked, protectedView, () => profileStore.isAdmin], ([value]) => {
+  if (!value) lastActivityAt = Date.now()
+  checkInactivity()
+}, { immediate: true, flush: 'sync' })
+watch(idleTimeoutMinutes, checkInactivity, { flush: 'sync' })
 
 async function unlock() {
   if (!floor.value || checking.value || !password.value) return
@@ -89,5 +124,21 @@ async function unlock() {
   }
 }
 
-onBeforeUnmount(() => { requestVersion++ })
+onMounted(() => {
+  for (const event of activityEvents) {
+    document.addEventListener(event, recordActivity, { capture: true, passive: true })
+  }
+  document.addEventListener('visibilitychange', checkInactivity)
+  window.addEventListener('focus', checkInactivity)
+  window.addEventListener('pageshow', checkInactivity)
+})
+
+onBeforeUnmount(() => {
+  requestVersion++
+  clearIdleTimer()
+  for (const event of activityEvents) document.removeEventListener(event, recordActivity, true)
+  document.removeEventListener('visibilitychange', checkInactivity)
+  window.removeEventListener('focus', checkInactivity)
+  window.removeEventListener('pageshow', checkInactivity)
+})
 </script>

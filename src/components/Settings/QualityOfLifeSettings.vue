@@ -1,7 +1,7 @@
 <template>
   <v-card>
     <v-card-text>
-      <SettingSection title="Advanced printer file list" :usecols="false">
+      <SettingSection title="Advanced printer file list" :usecols="false" collapsible>
         <v-progress-linear v-if="loading" indeterminate aria-label="Loading quality of life settings" />
         <v-checkbox
           v-model="enabled"
@@ -42,7 +42,7 @@
           <v-btn v-if="!loaded" variant="text" @click="loadSettings">Retry</v-btn>
         </v-alert>
       </SettingSection>
-      <SettingSection title="Print assignment" :usecols="false">
+      <SettingSection title="Print assignment" :usecols="false" collapsible>
         <v-checkbox
           v-model="assignmentEnabled"
           :disabled="loading || saving || !loaded"
@@ -60,7 +60,8 @@
           @update:model-value="saveGridDisplay"
         />
       </SettingSection>
-      <SettingSection title="Pre-print status check" :usecols="false">
+      <UserDirectorySettings v-if="loaded && assignmentEnabled" />
+      <SettingSection title="Pre-print status check" :usecols="false" collapsible>
         <v-checkbox
           v-model="statusCheckEnabled"
           :disabled="loading || saving || !loaded"
@@ -70,7 +71,7 @@
           @update:model-value="saveStatusCheck"
         />
       </SettingSection>
-      <SettingSection title="Printer grid status colours" :usecols="false">
+      <SettingSection title="Printer grid status colours" :usecols="false" collapsible>
         <v-checkbox
           v-model="gridColorsEnabled"
           :disabled="loading || saving || !loaded"
@@ -90,7 +91,7 @@
           </label>
         </div>
       </SettingSection>
-      <SettingSection title="Floor grid view locks" :usecols="false">
+      <SettingSection title="Floor grid view locks" :usecols="false" collapsible>
         <v-checkbox
           v-model="floorGridLockEnabled"
           :disabled="loading || saving || !loaded"
@@ -101,6 +102,26 @@
         />
         <div v-if="floorGridLockEnabled" class="text-body-2 ml-4">
           Set a password per group in Settings &gt; Floors. A password is required each time a protected grid is opened.
+          <v-checkbox
+            v-model="floorGridAutoLockEnabled"
+            :disabled="loading || saving || !loaded"
+            label="Auto-lock after inactivity"
+            hint="Re-lock unlocked protected grids after no user activity. Administrators bypass this. Running prints are unaffected."
+            persistent-hint
+            @update:model-value="saveFloorGridLock"
+          />
+          <v-text-field
+            v-if="floorGridAutoLockEnabled"
+            v-model.number="floorGridIdleTimeoutMinutes"
+            :disabled="loading || saving || !loaded"
+            label="Inactivity timeout (minutes)"
+            aria-label="Inactivity timeout (minutes)"
+            type="number"
+            min="1"
+            step="1"
+            :rules="[value => Number.isSafeInteger(Number(value)) && Number(value) >= 1 || 'Enter a whole number of at least 1 minute.']"
+            @change="saveFloorGridLock"
+          />
         </div>
       </SettingSection>
     </v-card-text>
@@ -115,6 +136,7 @@ import { useSettingsStore } from '@/store/settings.store'
 import type { AdvancedFileListColumns } from '@/models/settings/server-settings.dto'
 import type { SettingsDto } from '@/models/settings/settings.model'
 import { defaultGridStatusColors, gridStatusLabels } from '@/shared/grid-status-colors'
+import UserDirectorySettings from '@/components/Settings/UserDirectorySettings.vue'
 
 const settingsStore = useSettingsStore()
 const enabled = ref(false)
@@ -123,6 +145,8 @@ const showAssigneeOnGrid = ref(false)
 const statusCheckEnabled = ref(false)
 const gridColorsEnabled = ref(false)
 const floorGridLockEnabled = ref(false)
+const floorGridAutoLockEnabled = ref(false)
+const floorGridIdleTimeoutMinutes = ref<number | string>(1)
 const gridColors = ref({ ...defaultGridStatusColors })
 const columns = ref<AdvancedFileListColumns>({ size: true, startedAt: true })
 const loading = ref(true)
@@ -135,6 +159,7 @@ let savedShowAssigneeOnGrid = false
 let savedStatusCheckEnabled = false
 let savedGridColorsEnabled = false
 let savedFloorGridLockEnabled = false
+let savedFloorGridIdleTimeoutMinutes = 0
 let savedGridColors = { ...defaultGridStatusColors }
 let savedColumns: AdvancedFileListColumns = { size: true, startedAt: true }
 
@@ -154,6 +179,9 @@ function applySettings(settings: SettingsDto) {
   gridColorsEnabled.value = savedGridColorsEnabled
   savedFloorGridLockEnabled = settings.server.floorGridLockEnabled === true
   floorGridLockEnabled.value = savedFloorGridLockEnabled
+  savedFloorGridIdleTimeoutMinutes = settings.server.floorGridIdleTimeoutMinutes ?? 0
+  floorGridAutoLockEnabled.value = savedFloorGridIdleTimeoutMinutes > 0
+  floorGridIdleTimeoutMinutes.value = savedFloorGridIdleTimeoutMinutes || 1
   gridColors.value = { ...savedGridColors }
   columns.value = { ...savedColumns }
 }
@@ -204,13 +232,20 @@ async function saveAssignment() {
 onMounted(loadSettings)
 
 async function saveFloorGridLock() {
+  const idleTimeoutMinutes = floorGridAutoLockEnabled.value ? Number(floorGridIdleTimeoutMinutes.value) : 0
+  if (!Number.isSafeInteger(idleTimeoutMinutes) || idleTimeoutMinutes < (floorGridAutoLockEnabled.value ? 1 : 0)) {
+    errorMessage.value = 'Enter a whole number of at least 1 minute.'
+    return
+  }
   saving.value = true
   errorMessage.value = ''
   try {
-    applySettings(await SettingsService.updateFloorGridLock(floorGridLockEnabled.value))
+    applySettings(await SettingsService.updateFloorGridLock(floorGridLockEnabled.value, idleTimeoutMinutes))
   } catch (error) {
     console.error('Failed to update floor grid locks:', error)
     floorGridLockEnabled.value = savedFloorGridLockEnabled
+    floorGridAutoLockEnabled.value = savedFloorGridIdleTimeoutMinutes > 0
+    floorGridIdleTimeoutMinutes.value = savedFloorGridIdleTimeoutMinutes || 1
     errorMessage.value = 'Could not save the floor grid lock setting. Please try again.'
   } finally {
     saving.value = false

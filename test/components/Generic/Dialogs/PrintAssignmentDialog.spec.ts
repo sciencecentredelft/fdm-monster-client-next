@@ -14,12 +14,17 @@ import { usePrinterStateStore } from '@/store/printer-state.store'
 import { PrintersService } from '@/backend/printers.service'
 import type { PrinterDto } from '@/models/printers/printer.model'
 import { MoonrakerType } from '@/shared/printer-types.constants'
+import { SettingsService } from '@/backend/settings.service'
+import type { PrintAssignee } from '@/models/settings/user-directory.dto'
 
 vi.mock('@/backend/printer-remote-file.service', () => ({
   PrinterRemoteFileService: { getLastPrintStarts: vi.fn() }
 }))
 vi.mock('@/backend/printers.service', () => ({
   PrintersService: { sendPrinterConnectCommand: vi.fn(), refreshSocket: vi.fn() }
+}))
+vi.mock('@/backend/settings.service', () => ({
+  SettingsService: { getUserDirectoryUsers: vi.fn() }
 }))
 
 const first = { printerId: 1, printerName: 'Alpha', fileName: 'folder/test.gcode', existingFile: true }
@@ -28,7 +33,7 @@ let wrapper: ReturnType<typeof mount>
 const body = () => new DOMWrapper(document.body)
 const input = () => body().get<HTMLInputElement>('input[aria-label="Assigned to"]')
 const button = (label: string) => body().findAll('button').find(button => button.text() === label)!
-const dialog = () => useDialog<DialogName.PrintAssignmentDialog, PrintAssignmentContext, string | null>(DialogName.PrintAssignmentDialog)
+const dialog = () => useDialog<DialogName.PrintAssignmentDialog, PrintAssignmentContext, PrintAssignee | '' | null>(DialogName.PrintAssignmentDialog)
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -36,6 +41,7 @@ beforeEach(() => {
   useSettingsStore().$patch({ settings: { server: {
     printAssignmentEnabled: true, checkPrinterStatusBeforePrint: true
   } } })
+  vi.mocked(SettingsService.getUserDirectoryUsers).mockResolvedValue([])
   usePrinterStore().printers = [first, second].map(target => ({
     id: target.printerId, name: target.printerName, enabled: true, printerType: 0,
     dateAdded: 0, disabledReason: '', webSocketURL: '', apiKey: '',
@@ -74,6 +80,44 @@ async function open(prints = [first]) {
 }
 
 describe('PrintAssignmentDialog', () => {
+  it('requires an API selection without manual fallback when manual names are disabled', async () => {
+    useSettingsStore().$patch({ settings: { server: {
+      userDirectoryApiEnabled: true, userDirectoryManualEntryAllowed: false,
+      checkPrinterStatusBeforePrint: false
+    } } })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(SettingsService.getUserDirectoryUsers).mockRejectedValueOnce(new Error('Unavailable'))
+    await open()
+    expect(body().text()).toContain('Manual names are disabled')
+    expect(body().text()).not.toContain('Enter a name manually')
+    expect(body().find('input[maxlength="100"]').exists()).toBe(false)
+    expect(button('Start print').attributes('disabled')).toBeDefined()
+    await body().get('form').trigger('submit')
+    expect(dialog().isDialogOpened()).toBe(true)
+    const person = { name: 'Ada', email: 'ada@example.com' }
+    vi.mocked(SettingsService.getUserDirectoryUsers).mockResolvedValue([person])
+    await button('Retry').trigger('click')
+    await flushPromises()
+    wrapper.findComponent({ name: 'VAutocomplete' }).vm.$emit('update:modelValue', person)
+    await flushPromises()
+    await body().get('form').trigger('submit')
+    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toEqual(person)
+  })
+
+  it('does not switch to manual entry for a previous assignee absent from the directory', async () => {
+    useSettingsStore().$patch({ settings: { server: {
+      userDirectoryApiEnabled: true, userDirectoryManualEntryAllowed: false,
+      checkPrinterStatusBeforePrint: false
+    } } })
+    vi.mocked(PrinterRemoteFileService.getLastPrintStarts).mockResolvedValue([
+      { fileName: first.fileName, startedAt: '2026-01-01', assignedTo: 'Removed Person' }
+    ])
+    await open()
+    expect(body().find('input[maxlength="100"]').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'VAutocomplete' }).exists()).toBe(true)
+    expect(button('Start print').attributes('disabled')).toBeDefined()
+  })
+
   it('blocks both button and form submission for an offline printer until live status is ready', async () => {
     usePrinterStateStore().$patch({
       printerEventsById: { 1: { current: { payload: {
@@ -101,7 +145,7 @@ describe('PrintAssignmentDialog', () => {
     expect(input().element.value).toBe('Alice')
     expect(button('Start print').attributes('disabled')).toBeUndefined()
     await body().get('form').trigger('submit')
-    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toBe('Alice')
+    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toEqual({ name: 'Alice', email: null })
   })
 
   it('refreshes unreachable connections and exposes retryable failures', async () => {
@@ -237,7 +281,7 @@ describe('PrintAssignmentDialog', () => {
     await body().get('form').trigger('submit')
     await flushPromises()
     expect(dialog().isDialogOpened()).toBe(false)
-    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toBe('Alice')
+    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toEqual({ name: 'Alice', email: null })
   })
 
   it('prefills only from the exact file path on the same printer and leaves it editable', async () => {
@@ -250,7 +294,7 @@ describe('PrintAssignmentDialog', () => {
     expect(input().element.value).toBe('Alice')
     await input().setValue('Bob')
     await body().get('form').trigger('submit')
-    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toBe('Bob')
+    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toEqual({ name: 'Bob', email: null })
   })
 
   it('uses one shared prefill only when all batch names agree', async () => {
@@ -289,7 +333,40 @@ describe('PrintAssignmentDialog', () => {
     expect(body().text()).toContain('Could not load previous assignments')
     await input().setValue('Alice')
     await body().get('form').trigger('submit')
-    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toBe('Alice')
+    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toEqual({ name: 'Alice', email: null })
+  })
+
+  it('uses the directory identity, including email, when API selection is enabled', async () => {
+    const person = { name: 'Ada Lovelace', email: 'ada@example.com' }
+    useSettingsStore().$patch({ settings: { server: {
+      printAssignmentEnabled: true, checkPrinterStatusBeforePrint: false, userDirectoryApiEnabled: true
+    } } })
+    vi.mocked(SettingsService.getUserDirectoryUsers).mockResolvedValue([person])
+    await open([{ ...first, existingFile: false }])
+    expect(SettingsService.getUserDirectoryUsers).toHaveBeenCalledOnce()
+    expect(body().text()).toContain('Enter a name manually')
+    const autocomplete = wrapper.findComponent({ name: 'VAutocomplete' })
+    expect(autocomplete.exists()).toBe(true)
+    autocomplete.vm.$emit('update:modelValue', person)
+    await flushPromises()
+    await body().get('form').trigger('submit')
+    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toEqual(person)
+  })
+
+  it('keeps manual assignment available when the directory API cannot be reached', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    useSettingsStore().$patch({ settings: { server: {
+      printAssignmentEnabled: true, checkPrinterStatusBeforePrint: false, userDirectoryApiEnabled: true
+    } } })
+    vi.mocked(SettingsService.getUserDirectoryUsers).mockRejectedValueOnce(new Error('Unavailable'))
+    await open([{ ...first, existingFile: false }])
+    expect(body().text()).toContain('Retry or enter a name manually')
+    await body().get('input[aria-label="Enter a name manually"]').setValue(true)
+    await input().setValue('Manual User')
+    await body().get('form').trigger('submit')
+    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toEqual({
+      name: 'Manual User', email: null
+    })
   })
 
   it('ignores a cancelled request when reopening for another file', async () => {
@@ -337,7 +414,7 @@ describe('PrintAssignmentDialog', () => {
     await input().setValue('Alice')
     expect(button('Start print').attributes('disabled')).toBeUndefined()
     await body().get('form').trigger('submit')
-    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toBe('Alice')
+    expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toEqual({ name: 'Alice', email: null })
   })
 
   it('offers manual recovery if a successful automatic reconnect is lost again', async () => {

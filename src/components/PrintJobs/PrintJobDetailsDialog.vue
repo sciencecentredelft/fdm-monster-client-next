@@ -73,6 +73,7 @@
                     <v-col v-if="job?.assignedTo" cols="12" md="6">
                       <div class="text-caption text-medium-emphasis">Assigned to</div>
                       <div class="text-body-2 font-weight-medium">{{ job.assignedTo }}</div>
+                      <div v-if="job.assignedEmail" class="text-body-2 text-medium-emphasis">{{ job.assignedEmail }}</div>
                     </v-col>
                   </v-row>
                 </v-card-text>

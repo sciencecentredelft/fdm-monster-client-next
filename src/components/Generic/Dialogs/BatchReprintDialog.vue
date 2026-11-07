@@ -161,15 +161,15 @@ async function submitBatchReprints() {
     const prints = selectedItems.value
       .filter(v => v.file?.path)
       .map(v => ({ printerId: v.printerId, path: v.file?.path || '' }))
-    const assignedTo = await confirmPrintAssignment(prints.map(print => ({
+    const assignee = await confirmPrintAssignment(prints.map(print => ({
       printerId: print.printerId,
       printerName: printerStore.printer(print.printerId)?.name ?? `Printer #${print.printerId}`,
       fileName: print.path,
       existingFile: true
     })))
-    if (assignedTo === null) return
+    if (assignee === null) return
     const results = await BatchService.batchReprintFiles(
-      prints, assignedTo
+      prints, assignee?.name, assignee?.email
     )
     const failures = results.filter(result => result.failure)
     if (failures.length) {

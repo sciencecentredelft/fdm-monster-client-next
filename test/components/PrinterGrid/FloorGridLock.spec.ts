@@ -33,9 +33,145 @@ beforeEach(() => {
   vi.mocked(FloorService.unlockGrid).mockResolvedValue({ unlocked: true, gridLockVersion: 'version-1' })
   render()
 })
-afterEach(() => { wrapper.unmount(); vi.restoreAllMocks() })
+afterEach(() => { wrapper.unmount(); vi.restoreAllMocks(); vi.useRealTimers() })
 
 describe('floor grid convenience lock', () => {
+  describe('inactivity auto-lock', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+      vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    })
+
+    it('locks at exactly one minute, clears the grant, and restarts the timeout after another unlock', async () => {
+      useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 1 } } })
+      await submit()
+      await vi.advanceTimersByTimeAsync(59999)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(true)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(false)
+      expect(wrapper.emitted('update:locked')?.at(-1)).toEqual([true])
+      expect(wrapper.get<HTMLInputElement>('input').element.value).toBe('')
+      await submit()
+      await vi.advanceTimersByTimeAsync(59999)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(true)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(false)
+    })
+
+    it.each(['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll'])(
+      'extends the timeout for %s activity', async event => {
+        useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 1 } } })
+        await submit()
+        await vi.advanceTimersByTimeAsync(45000)
+        document.dispatchEvent(new Event(event))
+        await vi.advanceTimersByTimeAsync(59999)
+        expect(wrapper.find('[data-test="grid"]').exists()).toBe(true)
+        await vi.advanceTimersByTimeAsync(1)
+        expect(wrapper.find('[data-test="grid"]').exists()).toBe(false)
+      }
+    )
+
+    it('does not count live printer updates as user activity', async () => {
+      useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 1 } } })
+      await submit()
+      await vi.advanceTimersByTimeAsync(45000)
+      useFloorStore().floors = [{ ...floor }]
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(15000)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(false)
+    })
+
+    it.each(['focus', 'pageshow', 'visibilitychange', 'pointerdown'])(
+      'checks elapsed wall time on %s after browser suspension instead of extending an expired grant', async event => {
+        useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 1 } } })
+        await submit()
+        vi.setSystemTime(Date.now() + 60000)
+        const target = event === 'visibilitychange' || event === 'pointerdown' ? document : window
+        target.dispatchEvent(new Event(event))
+        await flushPromises()
+        expect(wrapper.find('[data-test="grid"]').exists()).toBe(false)
+      }
+    )
+
+    it('does not count events in a hidden tab as activity', async () => {
+      useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 1 } } })
+      await submit()
+      await vi.advanceTimersByTimeAsync(45000)
+      vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+      document.dispatchEvent(new Event('pointermove'))
+      await vi.advanceTimersByTimeAsync(15000)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(false)
+    })
+
+    it('keeps auto-lock disabled by default and reschedules when the configured timeout changes', async () => {
+      await submit()
+      await vi.advanceTimersByTimeAsync(600000)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(true)
+      document.dispatchEvent(new Event('keydown'))
+      useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 2 } } })
+      await vi.advanceTimersByTimeAsync(60000)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(true)
+      useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 1 } } })
+      await flushPromises()
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(false)
+    })
+
+    it('cancels the timer when disabled and never auto-locks administrators or unprotected floors', async () => {
+      useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 1 } } })
+      await submit()
+      await vi.advanceTimersByTimeAsync(30000)
+      useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 0 } } })
+      await vi.advanceTimersByTimeAsync(60000)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(true)
+      useProfileStore().roles = ['ADMIN']
+      useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 1 } } })
+      await vi.advanceTimersByTimeAsync(60000)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(true)
+      useProfileStore().roles = ['OPERATOR']
+      useFloorStore().selectedFloorIndex = 1
+      await vi.advanceTimersByTimeAsync(60000)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(true)
+    })
+
+    it('does not extend the timeout when the tab regains focus before the deadline', async () => {
+      useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 1 } } })
+      await submit()
+      await vi.advanceTimersByTimeAsync(30000)
+      window.dispatchEvent(new Event('focus'))
+      await vi.advanceTimersByTimeAsync(30000)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(false)
+    })
+
+    it('cancels the timer immediately if the master grid-lock feature is disabled', async () => {
+      useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 1 } } })
+      await submit()
+      useSettingsStore().$patch({ settings: { server: { floorGridLockEnabled: false } } })
+      expect(vi.getTimerCount()).toBe(0)
+      await vi.advanceTimersByTimeAsync(60000)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(true)
+    })
+
+    it('does not overflow browser timers for very large minute values', async () => {
+      useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 40000 } } })
+      await submit()
+      await vi.advanceTimersByTimeAsync(60000)
+      expect(wrapper.find('[data-test="grid"]').exists()).toBe(true)
+    })
+
+    it('removes its activity listeners and timer on unmount', async () => {
+      useSettingsStore().$patch({ settings: { server: { floorGridIdleTimeoutMinutes: 1 } } })
+      await submit()
+      const remove = vi.spyOn(document, 'removeEventListener')
+      const removeWindow = vi.spyOn(window, 'removeEventListener')
+      wrapper.unmount()
+      expect(remove).toHaveBeenCalledWith('pointermove', expect.any(Function), true)
+      expect(remove).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
+      expect(removeWindow).toHaveBeenCalledWith('focus', expect.any(Function))
+      expect(removeWindow).toHaveBeenCalledWith('pageshow', expect.any(Function))
+      expect(vi.getTimerCount()).toBe(0)
+    })
+  })
+
   it('hides the grid until a correct password and provides a manual lock', async () => {
     expect(wrapper.find('[data-test="grid"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Protected floor')

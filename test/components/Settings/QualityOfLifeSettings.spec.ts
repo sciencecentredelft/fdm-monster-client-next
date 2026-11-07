@@ -9,6 +9,24 @@ import type { SettingsDto } from '@/models/settings/settings.model'
 import type { AdvancedFileListColumns } from '@/models/settings/server-settings.dto'
 import { defaultGridStatusColors } from '@/shared/grid-status-colors'
 
+vi.mock('@/backend/settings.service', () => ({
+  SettingsService: {
+    getUserDirectorySettings: vi.fn().mockResolvedValue({
+      config: {
+        enabled: false, endpoint: '', method: 'GET', authMode: 'none',
+        credentialPlacement: 'form', clientId: '', clientIdField: 'client_id',
+        clientSecretField: 'client_secret', tokenEndpoint: '',
+        tokenCredentialPlacement: 'form', scope: '', accessTokenPath: 'access_token',
+        tokenTypePath: 'token_type', usersPath: 'users', namePath: 'name', emailPath: 'email'
+      },
+      hasClientSecret: false
+    }),
+    updateUserDirectorySettings: vi.fn(),
+    testUserDirectoryConnection: vi.fn(),
+    getUserDirectoryUsers: vi.fn()
+  }
+}))
+
 vi.mock('@/backend', () => ({
   SettingsService: {
     getSettings: vi.fn(),
@@ -48,10 +66,30 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks() })
 
 describe('QualityOfLifeSettings', () => {
+  it('lets each QoL section collapse independently without losing its controls', async () => {
+    const wrapper = mount(QualityOfLifeSettings, {
+      attachTo: document.body,
+      global: { plugins: [createPinia(), createVuetify()] }
+    })
+    await flushPromises()
+    const section = wrapper.findAllComponents({ name: 'SettingSection' })
+      .find(component => component.props('title') === 'Advanced printer file list')!
+    const other = wrapper.findAllComponents({ name: 'SettingSection' })
+      .find(component => component.props('title') === 'Print assignment')!
+    expect(section.get('[data-setting-content]').isVisible()).toBe(true)
+    await section.get('button[aria-expanded]').trigger('click')
+    expect(section.get('button').attributes('aria-expanded')).toBe('false')
+    expect(section.get('[data-setting-content]').isVisible()).toBe(false)
+    expect(other.get('[data-setting-content]').isVisible()).toBe(true)
+    await section.get('button[aria-expanded]').trigger('click')
+    expect(section.get('[data-setting-content]').isVisible()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('defaults floor grid locks off, saves independently, and rolls back failures', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    vi.mocked(SettingsService.updateFloorGridLock).mockImplementation(async enabled => ({
-      ...settings(), server: { ...settings().server, floorGridLockEnabled: enabled }
+    vi.mocked(SettingsService.updateFloorGridLock).mockImplementation(async (enabled, idleTimeoutMinutes) => ({
+      ...settings(), server: { ...settings().server, floorGridLockEnabled: enabled, floorGridIdleTimeoutMinutes: idleTimeoutMinutes }
     }))
     const pinia = createPinia()
     const wrapper = mount(QualityOfLifeSettings, { global: { plugins: [pinia, createVuetify()] } })
@@ -61,7 +99,7 @@ describe('QualityOfLifeSettings', () => {
     expect(wrapper.text()).not.toContain('Set a password per group')
     await toggle.setValue(true)
     await flushPromises()
-    expect(SettingsService.updateFloorGridLock).toHaveBeenCalledWith(true)
+    expect(SettingsService.updateFloorGridLock).toHaveBeenCalledWith(true, 0)
     expect(useSettingsStore(pinia).serverSettings?.floorGridLockEnabled).toBe(true)
     expect(wrapper.text()).toContain('Set a password per group')
     vi.mocked(SettingsService.updateFloorGridLock).mockRejectedValueOnce(new Error('Offline'))
@@ -69,6 +107,67 @@ describe('QualityOfLifeSettings', () => {
     await flushPromises()
     expect(toggle.element.checked).toBe(true)
     expect(wrapper.text()).toContain('Could not save the floor grid lock setting')
+    wrapper.unmount()
+  })
+
+  it('only shows inactivity settings for enabled grid locks and saves a one-minute timeout when selected', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(SettingsService.updateFloorGridLock).mockImplementation(async (enabled, idleTimeoutMinutes) => ({
+      ...settings(), server: { ...settings().server, floorGridLockEnabled: enabled, floorGridIdleTimeoutMinutes: idleTimeoutMinutes }
+    }))
+    const pinia = createPinia()
+    const wrapper = mount(QualityOfLifeSettings, { global: { plugins: [pinia, createVuetify()] } })
+    await flushPromises()
+    expect(wrapper.find('input[aria-label="Auto-lock after inactivity"]').exists()).toBe(false)
+    await wrapper.get('input[aria-label="Enable password locks for floor grid views"]').setValue(true)
+    await flushPromises()
+    const autoLock = wrapper.get<HTMLInputElement>('input[aria-label="Auto-lock after inactivity"]')
+    expect(autoLock.element.checked).toBe(false)
+    expect(wrapper.find('input[aria-label="Inactivity timeout (minutes)"]').exists()).toBe(false)
+    await autoLock.setValue(true)
+    await flushPromises()
+    expect(SettingsService.updateFloorGridLock).toHaveBeenLastCalledWith(true, 1)
+    const minutes = wrapper.get<HTMLInputElement>('input[aria-label="Inactivity timeout (minutes)"]')
+    expect(minutes.element.value).toBe('1')
+    await minutes.setValue('3')
+    await flushPromises()
+    expect(useSettingsStore(pinia).serverSettings?.floorGridIdleTimeoutMinutes).toBe(3)
+    vi.mocked(SettingsService.updateFloorGridLock).mockRejectedValueOnce(new Error('Offline'))
+    await minutes.setValue('2')
+    await flushPromises()
+    expect(minutes.element.value).toBe('3')
+    expect(wrapper.text()).toContain('Could not save the floor grid lock setting')
+    await wrapper.get('input[aria-label="Enable password locks for floor grid views"]').setValue(false)
+    await flushPromises()
+    expect(SettingsService.updateFloorGridLock).toHaveBeenLastCalledWith(false, 3)
+    expect(wrapper.find('input[aria-label="Auto-lock after inactivity"]').exists()).toBe(false)
+    await wrapper.get('input[aria-label="Enable password locks for floor grid views"]').setValue(true)
+    await flushPromises()
+    expect(wrapper.get<HTMLInputElement>('input[aria-label="Inactivity timeout (minutes)"]').element.value).toBe('3')
+    await wrapper.get('input[aria-label="Auto-lock after inactivity"]').setValue(false)
+    await flushPromises()
+    expect(SettingsService.updateFloorGridLock).toHaveBeenLastCalledWith(true, 0)
+    expect(wrapper.find('input[aria-label="Inactivity timeout (minutes)"]').exists()).toBe(false)
+    const saved = useSettingsStore(pinia).settings!
+    wrapper.unmount()
+    vi.mocked(SettingsService.getSettings).mockResolvedValue(saved)
+    const reloaded = mount(QualityOfLifeSettings, { global: { plugins: [pinia, createVuetify()] } })
+    await flushPromises()
+    expect(reloaded.get<HTMLInputElement>('input[aria-label="Auto-lock after inactivity"]').element.checked).toBe(false)
+    reloaded.unmount()
+  })
+
+  it.each(['', '0', '-1', '1.5'])('does not save invalid inactivity minutes %j', async value => {
+    vi.mocked(SettingsService.getSettings).mockResolvedValue({
+      ...settings(), server: { ...settings().server, floorGridLockEnabled: true, floorGridIdleTimeoutMinutes: 1 }
+    })
+    const wrapper = mount(QualityOfLifeSettings, { global: { plugins: [createPinia(), createVuetify()] } })
+    await flushPromises()
+    const minutes = wrapper.get('input[aria-label="Inactivity timeout (minutes)"]')
+    await minutes.setValue(value)
+    await flushPromises()
+    expect(SettingsService.updateFloorGridLock).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Enter a whole number of at least 1 minute.')
     wrapper.unmount()
   })
   it('hides colour controls until enabled and preserves colours across toggles, errors, and reloads', async () => {

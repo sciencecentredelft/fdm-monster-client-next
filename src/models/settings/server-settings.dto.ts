@@ -19,6 +19,9 @@ export interface ServerSettingsDto {
   checkPrinterStatusBeforePrint?: boolean
   gridStatusColorsEnabled?: boolean
   floorGridLockEnabled?: boolean
+  floorGridIdleTimeoutMinutes?: number
+  userDirectoryApiEnabled?: boolean
+  userDirectoryManualEntryAllowed?: boolean
   gridStatusColors?: GridStatusColors
   advancedFileListColumns?: AdvancedFileListColumns
 }

@@ -2,11 +2,12 @@ import { useSettingsStore } from '@/store/settings.store'
 import { useDialog } from '@/shared/dialog.composable'
 import { DialogName } from '@/components/Generic/Dialogs/dialog.constants'
 import type { PrintAssignmentContext } from '@/components/Generic/Dialogs/dialog.types'
+import type { PrintAssignee } from '@/models/settings/user-directory.dto'
 
 export async function confirmPrintAssignment(prints: PrintAssignmentContext['prints']) {
   const settings = useSettingsStore().serverSettings
   if (!settings?.printAssignmentEnabled && !settings?.checkPrinterStatusBeforePrint) return undefined
-  const dialog = useDialog<DialogName.PrintAssignmentDialog, PrintAssignmentContext, string | null>(
+  const dialog = useDialog<DialogName.PrintAssignmentDialog, PrintAssignmentContext, PrintAssignee | '' | null>(
     DialogName.PrintAssignmentDialog
   )
   if (dialog.isDialogOpened()) throw new Error('Finish the open print confirmation before starting another print.')

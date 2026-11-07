@@ -25,7 +25,7 @@ beforeEach(async () => {
     file: { path: `${printerId}.gcode`, dir: false, date: null, size: 1024 }
   })))
   vi.mocked(BatchService.batchReprintFiles).mockResolvedValue([{ printerId: 1, success: true }, { printerId: 2, success: true }])
-  vi.mocked(confirmPrintAssignment).mockResolvedValue('Alice')
+  vi.mocked(confirmPrintAssignment).mockResolvedValue({ name: 'Alice', email: null })
   wrapper = mount(BatchReprintDialog, {
     global: {
       plugins: [createVuetify()],
@@ -52,7 +52,7 @@ describe('batch reprint assignment', () => {
     ])
     expect(BatchService.batchReprintFiles).toHaveBeenCalledWith([
       { printerId: 1, path: '1.gcode' }, { printerId: 2, path: '2.gcode' }
-    ], 'Alice')
+    ], 'Alice', null)
   })
 
   it('does not send a batch command when the assignment popup is cancelled', async () => {

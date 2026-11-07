@@ -5,6 +5,7 @@ export interface QueuedUpload {
   file: File
   startPrint: boolean
   assignedTo?: string
+  assignedEmail?: string | null
 }
 
 export interface FailedQueuedUpload extends QueuedUpload {

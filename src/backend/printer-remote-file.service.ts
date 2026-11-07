@@ -35,18 +35,26 @@ export class PrinterRemoteFileService extends BaseService {
     filePath: string,
     print = true,
     assignedTo?: string,
+    assignedEmail?: string | null,
   ) {
     const path = ServerApi.printerFilesStartPrintRoute(printerId);
-    return await this.post(path, { filePath, print, assignedTo });
+    return await this.post(path, { filePath, print, assignedTo, assignedEmail });
   }
 
-  static async uploadFile(printer: PrinterDto, file: File, startPrint: boolean = true, assignedTo?: string) {
+  static async uploadFile(
+    printer: PrinterDto,
+    file: File,
+    startPrint: boolean = true,
+    assignedTo?: string,
+    assignedEmail?: string | null
+  ) {
     const path = ServerApi.printerFilesUploadRoute(printer.id);
 
     const formData = new FormData();
     formData.append("startPrint", startPrint.toString());
     formData.append("files[0]", file);
     if (assignedTo) formData.append("assignedTo", assignedTo);
+    if (assignedEmail) formData.append("assignedEmail", assignedEmail);
 
     return this.postUpload(path, formData, {
       onUploadProgress: (progress) => {

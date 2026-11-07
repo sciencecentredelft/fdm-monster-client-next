@@ -14,4 +14,5 @@ export interface LastPrintStartDto {
   fileName: string
   startedAt: string
   assignedTo?: string | null
+  assignedEmail?: string | null
 }

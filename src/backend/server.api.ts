@@ -22,6 +22,10 @@ export class ServerApi {
   static readonly userProfileRoute = `${ServerApi.userRoute}/profile`
   static readonly settingsRoute = `${ServerApi.base}/settings`
   static readonly settingsSensitiveRoute = `${ServerApi.settingsRoute}/sensitive`
+  static readonly userDirectorySettingsRoute = `${ServerApi.settingsRoute}/user-directory`
+  static readonly userDirectoryTestRoute = `${ServerApi.userDirectorySettingsRoute}/test`
+  static readonly userDirectoryRefreshRoute = `${ServerApi.userDirectorySettingsRoute}/refresh`
+  static readonly userDirectoryUsersRoute = `${ServerApi.userDirectorySettingsRoute}/users`
   static readonly updateLoginRequiredRoute = `${ServerApi.settingsRoute}/login-required`
   static readonly updateRegistrationEnabledRoute = `${ServerApi.settingsRoute}/registration-enabled`
   static readonly updateCredentialSettings = `${ServerApi.settingsRoute}/credential`

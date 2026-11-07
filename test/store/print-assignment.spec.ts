@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   setActivePinia(createPinia())
   usePrinterStore().printers = [printer, other]
-  vi.mocked(confirmPrintAssignment).mockResolvedValue('Alice')
+  vi.mocked(confirmPrintAssignment).mockResolvedValue({ name: 'Alice', email: null })
 })
 
 describe('immediate print assignment flows', () => {
@@ -33,7 +33,7 @@ describe('immediate print assignment flows', () => {
     expect(confirmPrintAssignment).toHaveBeenCalledWith([{
       printerId: 1, printerName: 'Alpha', fileName: 'folder/test.gcode', existingFile: true
     }])
-    expect(PrinterRemoteFileService.selectAndPrintFile).toHaveBeenCalledWith(1, 'folder/test.gcode', true, 'Alice')
+    expect(PrinterRemoteFileService.selectAndPrintFile).toHaveBeenCalledWith(1, 'folder/test.gcode', true, 'Alice', null)
   })
 
   it('does not send a print command after cancellation', async () => {
@@ -45,7 +45,7 @@ describe('immediate print assignment flows', () => {
   it('keeps the original print request when assignment is disabled', async () => {
     vi.mocked(confirmPrintAssignment).mockResolvedValue(undefined)
     await usePrinterStateStore().selectAndPrintFile({ printerId: 1, fullPath: 'test.gcode' })
-    expect(PrinterRemoteFileService.selectAndPrintFile).toHaveBeenCalledWith(1, 'test.gcode', true, undefined)
+    expect(PrinterRemoteFileService.selectAndPrintFile).toHaveBeenCalledWith(1, 'test.gcode', true, undefined, undefined)
   })
 
   it('confirms a whole upload batch once and carries the name into each deferred upload', async () => {
@@ -61,8 +61,8 @@ describe('immediate print assignment flows', () => {
     ])
     await store.handleNextUpload()
     await store.handleNextUpload()
-    expect(PrinterRemoteFileService.uploadFile).toHaveBeenNthCalledWith(1, printer, file, true, 'Alice')
-    expect(PrinterRemoteFileService.uploadFile).toHaveBeenNthCalledWith(2, other, file, true, 'Alice')
+    expect(PrinterRemoteFileService.uploadFile).toHaveBeenNthCalledWith(1, printer, file, true, 'Alice', null)
+    expect(PrinterRemoteFileService.uploadFile).toHaveBeenNthCalledWith(2, other, file, true, 'Alice', null)
   })
 
   it('does not enqueue uploads after cancellation', async () => {
@@ -78,6 +78,6 @@ describe('immediate print assignment flows', () => {
     await store.queueUploads([{ printer, file, startPrint: false }])
     expect(confirmPrintAssignment).not.toHaveBeenCalled()
     await store.handleNextUpload()
-    expect(PrinterRemoteFileService.uploadFile).toHaveBeenCalledWith(printer, file, false, undefined)
+    expect(PrinterRemoteFileService.uploadFile).toHaveBeenCalledWith(printer, file, false, undefined, undefined)
   })
 })

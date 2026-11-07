@@ -9,10 +9,39 @@ import {
 } from '@/models/settings/settings.model'
 
 import type { GridStatusColors } from '@/shared/grid-status-colors'
+import type { UserDirectoryConfig, UserDirectoryPerson, UserDirectorySettings } from '@/models/settings/user-directory.dto'
 
 export class SettingsService extends BaseService {
-  static async updateFloorGridLock(enabled: boolean) {
-    return await this.put<SettingsDto>(`${ServerApi.settingsRoute}/floor-grid-lock`, { enabled })
+  static async getUserDirectorySettings() {
+    return await this.get<UserDirectorySettings>(ServerApi.userDirectorySettingsRoute)
+  }
+
+  static async updateUserDirectorySettings(
+    config: UserDirectoryConfig,
+    clientSecret?: string,
+    clearClientSecret = false
+  ) {
+    return await this.put<UserDirectorySettings>(ServerApi.userDirectorySettingsRoute, {
+      config,
+      ...(clientSecret ? { clientSecret } : {}),
+      ...(clearClientSecret ? { clearClientSecret: true } : {})
+    })
+  }
+
+  static async testUserDirectoryConnection() {
+    return await this.post<{ success: true; userCount: number }>(ServerApi.userDirectoryTestRoute, {})
+  }
+
+  static async getUserDirectoryUsers() {
+    return await this.get<UserDirectoryPerson[]>(ServerApi.userDirectoryUsersRoute)
+  }
+
+  static async refreshUserDirectoryUsers() {
+    return await this.post<{ success: true; userCount: number }>(ServerApi.userDirectoryRefreshRoute, {})
+  }
+
+  static async updateFloorGridLock(enabled: boolean, idleTimeoutMinutes?: number) {
+    return await this.put<SettingsDto>(`${ServerApi.settingsRoute}/floor-grid-lock`, { enabled, idleTimeoutMinutes })
   }
 
   static async updateGridStatusColors(enabled: boolean, colors: GridStatusColors) {

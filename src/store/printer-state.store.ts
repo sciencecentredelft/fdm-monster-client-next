@@ -241,11 +241,13 @@ export const usePrinterStateStore = defineStore('PrinterState', {
         return
       }
 
-      const assignedTo = await confirmPrintAssignment([{
+      const assignee = await confirmPrintAssignment([{
         printerId, printerName: printer.name, fileName: fullPath, existingFile: true
       }])
-      if (assignedTo === null) return
-      await PrinterRemoteFileService.selectAndPrintFile(printerId, fullPath, true, assignedTo)
+      if (assignee === null) return
+      await PrinterRemoteFileService.selectAndPrintFile(
+        printerId, fullPath, true, assignee?.name, assignee?.email
+      )
       return true
     }
   }
