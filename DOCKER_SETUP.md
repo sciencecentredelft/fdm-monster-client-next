@@ -62,6 +62,14 @@ QoL settings, file browsing and API assignees on one supervised printer before
 batch use. Pulling this repository without rebuilding the image does not update
 the running client.
 
+When the advanced file list is enabled, its **Column widths** menu adjusts each
+visible column's relative width and saves the proportions in the current browser. Use
+**Reset widths** to restore defaults. Narrow filenames are shortened in the middle;
+hover to see the full path. Searching, sorting and file actions still use full
+names/paths. Columns automatically scale to the panel width; action buttons wrap
+when necessary rather than disappearing off the side. The normal file list is
+unchanged.
+
 Do not delete farm volumes or use `down -v`. Server migrations mean rollback may
 require the pre-update database/media backup as well as the previous image; follow
 the full server guide rather than deploying an older client alone.

@@ -58,6 +58,7 @@ declare module 'vue' {
     MaintenanceLogs: typeof import('./components/MaintenanceLogs/MaintenanceLogs.vue')['default']
     MaintenanceLogsView: typeof import('./components/MaintenanceLogs/MaintenanceLogsView.vue')['default']
     ManageTagsDialog: typeof import('./components/Generic/Dialogs/ManageTagsDialog.vue')['default']
+    MiddleTruncatedName: typeof import('./components/Files/MiddleTruncatedName.vue')['default']
     NavigationBar: typeof import('./components/NavigationBar.vue')['default']
     NotFoundView: typeof import('./components/NotFound/NotFoundView.vue')['default']
     OctoFarmImportDialog: typeof import('./components/Generic/Dialogs/OctoFarmImportDialog.vue')['default']

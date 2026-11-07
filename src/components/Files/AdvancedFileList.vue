@@ -1,5 +1,31 @@
 <template>
   <div class="advanced-file-list">
+    <v-menu :close-on-content-click="false">
+      <template #activator="{ props: menuProps }">
+        <v-btn v-bind="menuProps" variant="text" size="small" class="align-self-end mb-2">
+          Column widths
+        </v-btn>
+      </template>
+      <v-card width="320" class="pa-4">
+        <v-card-title class="pa-0 mb-3">Column widths</v-card-title>
+        <v-slider
+          v-for="header in headers"
+          :key="header.key"
+          v-model="columnWidths[header.key]"
+          :label="header.title"
+          :aria-label="`${header.title} column width`"
+          :min="columnDefinitions[header.key].min"
+          :max="600"
+          :step="10"
+          thumb-label
+          hide-details
+        />
+        <p class="text-caption mt-2">Relative widths, saved in this browser. Columns scale to fit the panel.</p>
+        <v-btn variant="text" size="small" class="mt-2" @click="columnWidths = { ...defaultColumnWidths }">
+          Reset widths
+        </v-btn>
+      </v-card>
+    </v-menu>
     <v-text-field
       v-model="search"
       aria-label="Search files"
@@ -33,31 +59,34 @@
           size="small"
           prepend-icon="folder"
           :title="item.path"
+          class="folder-name"
           @click="emit('navigate', item.path)"
         >
-          {{ item.name }}
+          <MiddleTruncatedName :text="item.name" />
         </v-btn>
         <span
           v-else
           :title="item.path"
           :class="{ 'text-primary font-weight-bold': item.path === currentPrintingFilePath }"
         >
-          {{ item.name }}
+          <MiddleTruncatedName :text="item.name" />
         </span>
       </template>
       <template #item.size="{ item }">
-        {{ item.file.dir ? '-' : formatFileSize(item.file.size ?? undefined) }}
+        <span class="column-text" :title="item.file.dir ? '-' : formatFileSize(item.file.size ?? undefined)">
+          {{ item.file.dir ? '-' : formatFileSize(item.file.size ?? undefined) }}
+        </span>
       </template>
       <template #item.startedAt="{ item }">
-        <span :title="item.dateTitle">
+        <span class="column-text" :title="item.dateTitle">
           {{ item.dateLabel }}
         </span>
       </template>
       <template #item.assignedTo="{ item }">
-        {{ item.assignmentLabel }}
+        <span class="column-text" :title="item.assignmentLabel">{{ item.assignmentLabel }}</span>
       </template>
       <template #item.actions="{ item }">
-        <div v-if="!item.file.dir" class="d-flex">
+        <div v-if="!item.file.dir" class="file-actions">
           <v-btn
             icon="download"
             aria-label="Download file"
@@ -95,6 +124,8 @@ import { PrinterRemoteFileService } from '@/backend/printer-remote-file.service'
 import type { FileDto, LastPrintStartDto } from '@/models/printers/printer-file.model'
 import { formatFileSize } from '@/utils/file-size.util'
 import type { AdvancedFileListColumns } from '@/models/settings/server-settings.dto'
+import { useLocalStorage } from '@vueuse/core'
+import MiddleTruncatedName from '@/components/Files/MiddleTruncatedName.vue'
 
 const props = withDefaults(defineProps<{
   files: FileDto[]
@@ -112,18 +143,52 @@ const emit = defineEmits<{
   delete: [file: FileDto]
 }>()
 
-const headers = computed(() => [
-  { title: 'Name', key: 'name' },
-  { title: 'Size', key: 'size' },
-  { title: 'Last print started', key: 'startedAt' },
-  { title: 'Assigned to', key: 'assignedTo' },
-  { title: 'Actions', key: 'actions', sortable: false }
-].filter(header => {
-  if (header.key === 'size') return props.columns.size
-  if (header.key === 'startedAt') return props.columns.startedAt
-  if (header.key === 'assignedTo') return props.columns.assignedTo === true
+const columnDefinitions = {
+  name: { title: 'Name', min: 100 },
+  size: { title: 'Size', min: 80 },
+  startedAt: { title: 'Last print started', min: 140 },
+  assignedTo: { title: 'Assigned to', min: 120 },
+  actions: { title: 'Actions', min: 120 }
+}
+type ColumnKey = keyof typeof columnDefinitions
+type ColumnWidths = Record<ColumnKey, number>
+const columnKeys: ColumnKey[] = ['name', 'size', 'startedAt', 'assignedTo', 'actions']
+const defaultColumnWidths: ColumnWidths = { name: 280, size: 100, startedAt: 180, assignedTo: 180, actions: 120 }
+const columnWidths = useLocalStorage<ColumnWidths>('advanced-file-list-column-widths', { ...defaultColumnWidths }, {
+  serializer: {
+    read: value => {
+      const saved: unknown = JSON.parse(value)
+      if (!saved || typeof saved !== 'object') throw new Error('Invalid saved file column widths')
+      const widths = { ...defaultColumnWidths }
+      for (const key of columnKeys) {
+        const width: unknown = Reflect.get(saved, key)
+        if (width === undefined) continue
+        if (typeof width !== 'number' || !Number.isFinite(width) || width < columnDefinitions[key].min || width > 600) {
+          throw new Error(`Invalid saved width for ${key}`)
+        }
+        widths[key] = width
+      }
+      return widths
+    },
+    write: value => JSON.stringify(value)
+  },
+  onError: error => console.error('Could not persist advanced file column widths:', error)
+})
+const visibleColumnKeys = computed(() => columnKeys.filter(key => {
+  if (key === 'size') return props.columns.size
+  if (key === 'startedAt') return props.columns.startedAt
+  if (key === 'assignedTo') return props.columns.assignedTo === true
   return true
 }))
+const headers = computed(() => {
+  const totalWidth = visibleColumnKeys.value.reduce((total, key) => total + columnWidths.value[key], 0)
+  return visibleColumnKeys.value.map(key => ({
+    title: columnDefinitions[key].title,
+    key,
+    width: `${columnWidths.value[key] / totalWidth * 100}%`,
+    sortable: key !== 'actions'
+  }))
+})
 const sortBy = ref<{ key: string; order: 'asc' | 'desc' }[]>([{ key: 'name', order: 'asc' }])
 const search = ref<string | null>('')
 const printStarts = ref<LastPrintStartDto[]>([])
@@ -209,10 +274,61 @@ const filteredFiles = computed(() => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  min-width: 0;
 }
 
 .advanced-file-list :deep(.v-table) {
   flex: 1 1 0;
   min-height: 0;
+}
+
+.advanced-file-list :deep(table) {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.advanced-file-list :deep(th),
+.advanced-file-list :deep(td) {
+  overflow: hidden;
+  padding-inline: 8px !important;
+}
+
+.advanced-file-list :deep(.v-data-table-header__content) {
+  min-width: 0;
+}
+
+.advanced-file-list :deep(.v-data-table-header__content > span) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-actions {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.file-actions :deep(.v-btn) {
+  flex-shrink: 0;
+}
+
+.column-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-name {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.folder-name :deep(.v-btn__content) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 </style>

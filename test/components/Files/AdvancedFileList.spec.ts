@@ -4,6 +4,7 @@ import { createVuetify } from 'vuetify'
 import AdvancedFileList from '@/components/Files/AdvancedFileList.vue'
 import { PrinterRemoteFileService } from '@/backend/printer-remote-file.service'
 import type { FileDto, LastPrintStartDto } from '@/models/printers/printer-file.model'
+import { VBtn, VSlider } from 'vuetify/components'
 
 vi.mock('@/backend/printer-remote-file.service', () => ({
   PrinterRemoteFileService: { getLastPrintStarts: vi.fn() }
@@ -41,15 +42,66 @@ async function sortColumn(wrapper: ReturnType<typeof render>, title: string) {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('visualViewport', undefined)
+  localStorage.removeItem('advanced-file-list-column-widths')
   vi.clearAllMocks()
   vi.mocked(PrinterRemoteFileService.getLastPrintStarts).mockResolvedValue(starts)
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 describe('AdvancedFileList', () => {
+  it('redistributes proportions when columns are hidden without changing saved preferences', async () => {
+    const wrapper = render({ columns: { size: true, startedAt: true, assignedTo: true } })
+    await flushPromises()
+    const saved = localStorage.getItem('advanced-file-list-column-widths')
+    await wrapper.setProps({ columns: { size: false, startedAt: false, assignedTo: false } })
+    await flushPromises()
+    const widths = wrapper.findAll<HTMLTableCellElement>('thead th').map(th => parseFloat(th.element.style.width))
+    expect(widths).toEqual([70, 30])
+    expect(localStorage.getItem('advanced-file-list-column-widths')).toBe(saved)
+    wrapper.unmount()
+  })
+
+  it('configures every visible column, persists widths, and resets them', async () => {
+    const wrapper = render({ columns: { size: true, startedAt: true, assignedTo: true } })
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'Column widths')!.trigger('click')
+    await flushPromises()
+    const sliders = wrapper.findAllComponents(VSlider)
+    expect(sliders.map(slider => slider.props('label'))).toEqual(['Name', 'Size', 'Last print started', 'Assigned to', 'Actions'])
+    for (const slider of sliders) slider.vm.$emit('update:modelValue', 300)
+    await flushPromises()
+    expect(wrapper.findAll<HTMLTableCellElement>('thead th').map(th => th.element.style.width)).toEqual(Array(5).fill('20%'))
+    expect(JSON.parse(localStorage.getItem('advanced-file-list-column-widths')!))
+      .toEqual({ name: 300, size: 300, startedAt: 300, assignedTo: 300, actions: 300 })
+    wrapper.unmount()
+    const restored = render({ columns: { size: true, startedAt: true, assignedTo: true } })
+    await flushPromises()
+    expect(restored.findAll<HTMLTableCellElement>('thead th').map(th => th.element.style.width)).toEqual(Array(5).fill('20%'))
+    await restored.findAll('button').find(button => button.text() === 'Column widths')!.trigger('click')
+    await flushPromises()
+    await restored.findAllComponents(VBtn).find(button => button.text() === 'Reset widths')!.trigger('click')
+    await flushPromises()
+    const widths = restored.findAll<HTMLTableCellElement>('thead th').map(th => parseFloat(th.element.style.width))
+    expect(widths.reduce((total, width) => total + width, 0)).toBeCloseTo(100)
+    expect(widths[0]! / widths[1]!).toBeCloseTo(2.8)
+    restored.unmount()
+  })
+
+  it('reports invalid stored widths and uses safe defaults', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    localStorage.setItem('advanced-file-list-column-widths', JSON.stringify({ name: -50 }))
+    const wrapper = render()
+    await flushPromises()
+    expect(error).toHaveBeenCalled()
+    expect(parseFloat(wrapper.find<HTMLTableCellElement>('thead th').element.style.width)).toBeCloseTo(280 / 680 * 100)
+    wrapper.unmount()
+  })
+
   it('shows, sorts, and searches assignments only when that column is configured, even without dates', async () => {
     vi.mocked(PrinterRemoteFileService.getLastPrintStarts).mockResolvedValue([
       { ...starts[0], assignedTo: 'Alice' },
