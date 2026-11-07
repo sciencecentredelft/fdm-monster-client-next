@@ -36,6 +36,7 @@ const button = (label: string) => body().findAll('button').find(button => button
 const dialog = () => useDialog<DialogName.PrintAssignmentDialog, PrintAssignmentContext, PrintAssignee | '' | null>(DialogName.PrintAssignmentDialog)
 
 beforeEach(() => {
+  vi.stubGlobal('visualViewport', undefined)
   vi.resetAllMocks()
   setActivePinia(createPinia())
   useSettingsStore().$patch({ settings: { server: {
@@ -72,6 +73,7 @@ afterEach(() => {
   document.body.innerHTML = ''
   vi.restoreAllMocks()
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
 async function open(prints = [first]) {
@@ -336,7 +338,7 @@ describe('PrintAssignmentDialog', () => {
     expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toEqual({ name: 'Alice', email: null })
   })
 
-  it('uses the directory identity, including email, when API selection is enabled', async () => {
+  it('shows names only in directory options and selection while preserving the email in the output', async () => {
     const person = { name: 'Ada Lovelace', email: 'ada@example.com' }
     useSettingsStore().$patch({ settings: { server: {
       printAssignmentEnabled: true, checkPrinterStatusBeforePrint: false, userDirectoryApiEnabled: true
@@ -347,8 +349,14 @@ describe('PrintAssignmentDialog', () => {
     expect(body().text()).toContain('Enter a name manually')
     const autocomplete = wrapper.findComponent({ name: 'VAutocomplete' })
     expect(autocomplete.exists()).toBe(true)
+    await input().trigger('mousedown')
+    await flushPromises()
+    expect(body().text()).toContain(person.name)
+    expect(body().text()).not.toContain(person.email)
     autocomplete.vm.$emit('update:modelValue', person)
     await flushPromises()
+    expect(body().text()).toContain(person.name)
+    expect(body().text()).not.toContain(person.email)
     await body().get('form').trigger('submit')
     expect(dialog().dialogStore.getOutput(DialogName.PrintAssignmentDialog)).toEqual(person)
   })

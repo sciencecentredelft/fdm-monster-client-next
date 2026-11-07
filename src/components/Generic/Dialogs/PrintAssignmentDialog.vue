@@ -63,14 +63,7 @@
             autofocus
             variant="outlined"
             class="mt-3"
-          >
-            <template #item="{ props, item }">
-              <v-list-item v-bind="props" :subtitle="item.raw.email" />
-            </template>
-            <template #selection="{ item }">
-              <span>{{ item.raw.name }} <span class="text-medium-emphasis">({{ item.raw.email }})</span></span>
-            </template>
-          </v-autocomplete>
+          />
           <v-text-field
             v-if="assignmentEnabled && (!directoryEnabled || manualEntry)"
             v-model="assignedTo"

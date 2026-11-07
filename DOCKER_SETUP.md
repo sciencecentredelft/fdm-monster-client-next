@@ -70,6 +70,10 @@ names/paths. Columns automatically scale to the panel width; action buttons wrap
 when necessary rather than disappearing off the side. The normal file list is
 unchanged.
 
+The API print-assignment picker displays names only. Email addresses remain part
+of the selected identity for server validation and print history, but are not
+displayed in the assignment options or selected-person field.
+
 Do not delete farm volumes or use `down -v`. Server migrations mean rollback may
 require the pre-update database/media backup as well as the previous image; follow
 the full server guide rather than deploying an older client alone.
