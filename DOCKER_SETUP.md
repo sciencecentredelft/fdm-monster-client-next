@@ -31,9 +31,10 @@ No host npm/Node installation is necessary. The client context ignores `.env`
 files, dependencies, Git history and test artifacts; client credentials must
 always be configured through the server, never embedded into a frontend build.
 
-Open **http://localhost:4000** and complete first-time setup. For LAN access, follow
-the server guide's `FDM_BIND_ADDRESS` and firewall instructions; the default bind
-is host-only. The production client uses the server origin automatically. Do not
+Open **http://localhost:4000** and complete first-time setup. The deployment
+publishes on all IPv4 interfaces by default; follow the server guide's firewall
+instructions to restrict access to the trusted LAN. The production client uses
+the server origin automatically. Do not
 set `VITE_API_BASE` to a laptop or localhost address for farm browsers.
 
 ## Persistence and updates

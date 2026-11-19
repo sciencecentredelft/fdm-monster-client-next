@@ -60,6 +60,7 @@ export const useUploadsStore = defineStore('Uploads', {
 
       try {
         await PrinterRemoteFileService.uploadFile(printer, file, startPrint, assignedTo, assignedEmail);
+        snackbar.info('Upload complete', `${file.name} to ${printer.name}`)
       } catch (e: any) {
         if (e.isAxiosError) {
           const failedUpload: FailedQueuedUpload = {
@@ -71,7 +72,7 @@ export const useUploadsStore = defineStore('Uploads', {
           this.failedUploads.push(failedUpload)
           snackbar.openErrorMessage({
             title: 'Upload failure',
-            subtitle: `File ${file.name}Upload failed for  to printer ${printer.name}`
+            subtitle: `Could not upload ${file.name} to ${printer.name}`
           })
         } else {
           snackbar.openErrorMessage({

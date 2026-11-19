@@ -6,6 +6,7 @@ import { useSnackbar } from "@/shared/snackbar.composable";
 import { downloadFileByBlob } from "@/utils/download-file.util";
 
 export class PrinterRemoteFileService extends BaseService {
+  private static uploadSequence = 0;
   static async getLastPrintStarts(printerId: number) {
     return await this.get<LastPrintStartDto[]>(
       `${ServerApi.printerRemoteFilesRoute}/${printerId}/last-print-starts`
@@ -56,17 +57,22 @@ export class PrinterRemoteFileService extends BaseService {
     if (assignedTo) formData.append("assignedTo", assignedTo);
     if (assignedEmail) formData.append("assignedEmail", assignedEmail);
 
-    return this.postUpload(path, formData, {
-      onUploadProgress: (progress) => {
-        const snackbar = useSnackbar();
-        snackbar.openProgressMessage(
-          "single-file-upload",
-          `Uploading file ${file.name}`,
-          (100 * progress.loaded) / progress.total!,
-          false,
-        );
-      },
-    });
+    const snackbar = useSnackbar();
+    const key = `printer-upload-${++this.uploadSequence}`;
+    const title = `${file.name} to ${printer.name}`;
+    const report = (value: number) => snackbar.openProgressMessage(key, title, value, false, "pending");
+    let settled = false;
+    report(0);
+    try {
+      return await this.postUpload(path, formData, {
+        onUploadProgress: ({ loaded, total }) => {
+          if (!settled && total) report(Math.min(100, (100 * loaded) / total));
+        },
+      });
+    } finally {
+      settled = true;
+      snackbar.openProgressMessage(key, title, 0, false, "settled");
+    }
   }
 
   static async deleteFileOrFolder(printerId: number, path: string) {

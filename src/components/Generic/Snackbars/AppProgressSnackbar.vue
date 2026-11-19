@@ -1,7 +1,7 @@
 <template>
   <v-snackbar
     v-model="snackbarOpened"
-    :timeout="progressTimeout"
+    :timeout="-1"
     location="bottom right"
     class="progress-snackbar"
     color="primary"
@@ -21,12 +21,12 @@
 
       <div class="flex-grow-1 min-width-0">
         <div class="text-body-1 font-weight-medium text-white mb-3">
-          {{ snackbarTitle }}
+          Uploading files
         </div>
 
         <div
-          v-for="(progress, index) in progressTracked"
-          :key="index"
+          v-for="progress in progressTracked"
+          :key="progress.key"
           class="mb-3"
         >
           <div class="d-flex align-center ga-2 mb-1">
@@ -39,7 +39,9 @@
             <span class="text-body-2 text-white">{{ progress.title }}</span>
             <v-spacer />
             <span class="text-body-2 text-white font-weight-bold">
-              {{ (progress.completed ? 100 : progress.value).toFixed(1) }}%
+              {{ progress.awaitingResponse && progress.value >= 100
+                ? 'Waiting for server'
+                : `${(progress.completed ? 100 : progress.value).toFixed(1)}%` }}
             </span>
           </div>
           <v-progress-linear
@@ -66,11 +68,10 @@
 </template>
 <script lang="ts" setup>
 import { ProgressMessage, useSnackbar } from '@/shared/snackbar.composable'
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 const snackbar = useSnackbar()
 const snackbarOpened = ref(false)
-const snackbarTitle = ref('')
 
 // Merged upload progress tracking
 interface ProgressTracked {
@@ -81,10 +82,10 @@ interface ProgressTracked {
   startedAt: number
   expiresAt: number
   timeoutAt?: number
+  awaitingResponse?: boolean
 }
 
 const progressTracked = ref<ProgressTracked[]>([])
-const progressTimeout = ref<number>(100)
 
 function getProgressByKey(key: string) {
   return progressTracked.value.find((p) => p.key === key)
@@ -114,15 +115,19 @@ function addProgressTracker(
 
 function removeProgressTracker(key: string) {
   progressTracked.value = progressTracked.value.filter((p) => p.key !== key)
+  if (!progressTracked.value.length) snackbarOpened.value = false
 }
 
+let expirationTimer: ReturnType<typeof setInterval>
+
 onMounted(() => {
-  setInterval(() => {
+  expirationTimer = setInterval(() => {
     if (!progressTracked.value.length) {
       return
     }
 
     for (const progress of progressTracked.value) {
+      if (progress.awaitingResponse) continue
       const { value, completed, expiresAt, key } = progress
       if ((completed || value >= 100) && expiresAt < Date.now()) {
         removeProgressTracker(key)
@@ -132,35 +137,34 @@ onMounted(() => {
         progress.timeoutAt = Date.now() + 5000
       }
     }
-    if (!progressTracked.value.length) {
-      // Dwell the notification snackbar for a timeout duration
-      progressTimeout.value = 2000
-      snackbarTitle.value = 'Upload ended'
-      console.debug(
-        `[AppSnackbars] Setting timeout to ${progressTimeout.value}`
-      )
-    } else {
-      progressTimeout.value = -1
-      snackbarOpened.value = true
-    }
   }, 1000)
   snackbar.onProgressMessage((data: ProgressMessage) => {
-    const { key, value, title, completed } = data
-    const record = getProgressByKey(key)
+    const { key, value, title, completed, requestState } = data
+    if (requestState === 'settled') {
+      removeProgressTracker(key)
+      return
+    }
+
+    let record = getProgressByKey(key)
     if (!record) {
-      if (value >= 100) {
+      if (value >= 100 && !requestState) {
         // If the value is above 100, don't consider it (bug/noise)
         return
       }
       addProgressTracker(key, title, value, false, Date.now() + 1500)
-    } else if (Math.min(100, value) >= record.value) {
+      record = getProgressByKey(key)
+      snackbarOpened.value = true
+    }
+    if (record && Math.min(100, value) >= record.value) {
       record.expiresAt = Date.now() + 1500
       record.value = value
       record.completed = completed
+      record.awaitingResponse = requestState === 'pending'
     }
-    snackbarTitle.value = 'Uploading files'
   })
 })
+
+onUnmounted(() => clearInterval(expirationTimer))
 </script>
 
 <style scoped>

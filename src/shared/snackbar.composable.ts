@@ -28,6 +28,7 @@ export interface ProgressMessage {
   title: string
   value: number
   completed: boolean
+  requestState?: 'pending' | 'settled'
 }
 
 export function useSnackbar() {
@@ -43,14 +44,16 @@ export function useSnackbar() {
       key: string,
       title: string,
       value: number,
-      completed: boolean
+      completed: boolean,
+      requestState?: ProgressMessage['requestState']
     ) =>
       emitProgressMessage({
         key,
         title,
         value,
-        completed
-      } as ProgressMessage),
+        completed,
+        requestState
+      }),
     openInfoMessage: (data: InfoMessage) => emitInfoMessage(data),
     info: (title: string, subtitle?: string, timeout?: number) =>
       emitInfoMessage({ title, subtitle, timeout }),
